@@ -234,3 +234,41 @@ model JadwalLaporan {
 
   @@map("jadwal_laporan")
 }
+
+model SumberDataPublik {
+  id             String   @id @default(uuid())
+  slug           String   @unique @db.VarChar(50)
+  nama           String   @db.VarChar(150)
+  lisensi        String?  @db.VarChar(200)
+  urlSumber      String?  @map("url_sumber") @db.Text
+  terakhirSyncAt DateTime? @map("terakhir_sync_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  indikator IndikatorPublik[]
+
+  @@map("sumber_data_publik")
+}
+
+model IndikatorPublik {
+  id            String   @id @default(uuid())
+  sumberId      String   @map("sumber_id")
+  kodeWilayah   String   @map("kode_wilayah") @db.VarChar(20)
+  namaWilayah   String   @map("nama_wilayah") @db.VarChar(150)
+  levelWilayah  String   @map("level_wilayah") @db.VarChar(30)
+  tahun         Int
+  kategori      String   @db.VarChar(80)
+  indikator     String   @db.VarChar(120)
+  nilai         Decimal  @db.Decimal(12, 4)
+  satuan        String?  @db.VarChar(30)
+  metadata      Json?
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  sumber SumberDataPublik @relation(fields: [sumberId], references: [id], onDelete: Cascade)
+
+  @@index([tahun, kategori])
+  @@index([kodeWilayah, levelWilayah])
+  @@index([indikator])
+  @@map("indikator_publik")
+}

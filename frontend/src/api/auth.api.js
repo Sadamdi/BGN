@@ -16,8 +16,12 @@ export function forgotPassword(email) {
   return api.post("/auth/forgot-password", { email }).then((r) => r.data);
 }
 
-export function resetPassword(token, password) {
-  return api.post(`/auth/reset-password/${token}`, { password }).then((r) => r.data);
+export function resetPassword(token, password, otp) {
+  return api.post(`/auth/reset-password/${token}`, { password, otp }).then((r) => r.data);
+}
+
+export function verifyResetOtp(token, otp) {
+  return api.post(`/auth/reset-password/${token}/verify-otp`, { otp }).then((r) => r.data);
 }
 
 export function ubahPassword(payload) {

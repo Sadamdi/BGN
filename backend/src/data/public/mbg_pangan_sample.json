@@ -1,0 +1,30 @@
+[
+  {
+    "kodeWilayah": "IDN",
+    "namaWilayah": "Indonesia",
+    "levelWilayah": "NASIONAL",
+    "tahun": 2026,
+    "kategori": "PANGAN",
+    "indikator": "HARGA_BERAS_MEDIAN",
+    "nilai": 15300,
+    "satuan": "RUPIAH_PER_KG",
+    "metadata": {
+      "sumberPublikasi": "PIHPS",
+      "komoditas": "Beras"
+    }
+  },
+  {
+    "kodeWilayah": "IDN",
+    "namaWilayah": "Indonesia",
+    "levelWilayah": "NASIONAL",
+    "tahun": 2026,
+    "kategori": "PANGAN",
+    "indikator": "HARGA_TELUR_MEDIAN",
+    "nilai": 32650,
+    "satuan": "RUPIAH_PER_KG",
+    "metadata": {
+      "sumberPublikasi": "PIHPS",
+      "komoditas": "Telur Ayam Ras"
+    }
+  }
+]

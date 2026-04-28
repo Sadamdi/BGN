@@ -13,6 +13,8 @@ const { emailResetPassword } = require("./email.service");
 const FAIL_TTL = 15 * 60;
 const LOCKOUT_TTL = 15 * 60;
 const MAX_FAIL = 5;
+const RESET_TTL = 30 * 60;
+const RESET_MAX_OTP_ATTEMPTS = 5;
 
 function publicUser(u) {
   return {
@@ -168,30 +170,81 @@ async function forgotPassword(email) {
   if (!user) return { delivered: true };
 
   const token = crypto.randomBytes(32).toString("hex");
-  await getRedis().set("reset:" + token, user.id, "EX", 30 * 60);
+  const otpCode = String(Math.floor(100000 + Math.random() * 900000));
+  const otpHash = crypto.createHash("sha256").update(otpCode).digest("hex");
+  const resetPayload = JSON.stringify({
+    userId: user.id,
+    otpHash,
+    attempts: 0,
+    maxAttempts: RESET_MAX_OTP_ATTEMPTS,
+    createdAt: Date.now(),
+  });
+  await getRedis().set("reset:" + token, resetPayload, "EX", RESET_TTL);
 
   const link = (process.env.FRONTEND_URL || "http://localhost:5173") + "/reset-password/" + token;
   await emailResetPassword({
     to: user.email,
     namaLengkap: user.namaLengkap,
     link,
+    otpCode,
+    ttlMinutes: Math.floor(RESET_TTL / 60),
   });
 
   return { delivered: true };
 }
 
-async function resetPassword({ token, newPassword }) {
-  if (!token || !newPassword) {
-    throw new HttpError(400, "Token atau password baru tidak lengkap", "BAD_REQUEST");
+function parseResetPayload(raw) {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch (_) {
+    return null;
+  }
+}
+
+async function verifyResetOtp({ token, otp }) {
+  if (!token || !otp) {
+    throw new HttpError(400, "Token atau OTP tidak lengkap", "BAD_REQUEST");
+  }
+  const key = "reset:" + token;
+  const raw = await getRedis().get(key);
+  const payload = parseResetPayload(raw);
+  if (!payload || !payload.userId || !payload.otpHash) {
+    throw new HttpError(400, "Token reset password tidak valid atau kedaluwarsa", "INVALID_TOKEN");
+  }
+  if ((payload.attempts || 0) >= (payload.maxAttempts || RESET_MAX_OTP_ATTEMPTS)) {
+    throw new HttpError(423, "OTP diblokir karena terlalu banyak percobaan", "OTP_LOCKED");
+  }
+  const incomingHash = crypto.createHash("sha256").update(String(otp)).digest("hex");
+  if (incomingHash !== payload.otpHash) {
+    payload.attempts = (payload.attempts || 0) + 1;
+    const ttl = await getRedis().ttl(key);
+    if (ttl > 0) await getRedis().set(key, JSON.stringify(payload), "EX", ttl);
+    if ((payload.attempts || 0) >= (payload.maxAttempts || RESET_MAX_OTP_ATTEMPTS)) {
+      throw new HttpError(423, "OTP diblokir karena terlalu banyak percobaan", "OTP_LOCKED");
+    }
+    throw new HttpError(400, "OTP tidak valid", "INVALID_OTP");
+  }
+  return { ok: true };
+}
+
+async function resetPassword({ token, otp, newPassword }) {
+  if (!token || !otp || !newPassword) {
+    throw new HttpError(400, "Token, OTP, atau password baru tidak lengkap", "BAD_REQUEST");
   }
   if (String(newPassword).length < 8) {
     throw new HttpError(422, "Password minimal 8 karakter", "WEAK_PASSWORD");
   }
-  const userId = await getRedis().get("reset:" + token);
-  if (!userId) throw new HttpError(400, "Token reset password tidak valid atau kedaluwarsa", "INVALID_TOKEN");
+  const key = "reset:" + token;
+  const raw = await getRedis().get(key);
+  const payload = parseResetPayload(raw);
+  if (!payload || !payload.userId || !payload.otpHash) {
+    throw new HttpError(400, "Token reset password tidak valid atau kedaluwarsa", "INVALID_TOKEN");
+  }
+  await verifyResetOtp({ token, otp });
   const passwordHash = await bcrypt.hash(String(newPassword), 12);
-  await prisma.pengguna.update({ where: { id: userId }, data: { passwordHash } });
-  await getRedis().del("reset:" + token);
+  await prisma.pengguna.update({ where: { id: payload.userId }, data: { passwordHash } });
+  await getRedis().del(key);
   return { ok: true };
 }
 
@@ -213,6 +266,7 @@ module.exports = {
   refreshAccessToken,
   logout,
   forgotPassword,
+  verifyResetOtp,
   resetPassword,
   ubahPassword,
   publicUser,

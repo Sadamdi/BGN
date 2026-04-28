@@ -1,0 +1,28 @@
+[
+  {
+    "kodeWilayah": "31",
+    "namaWilayah": "DKI Jakarta",
+    "levelWilayah": "PROVINSI",
+    "tahun": 2024,
+    "kategori": "WILAYAH",
+    "indikator": "LUAS_WILAYAH",
+    "nilai": 661.52,
+    "satuan": "KM2",
+    "metadata": {
+      "sumberPublikasi": "BIG / BPS"
+    }
+  },
+  {
+    "kodeWilayah": "32",
+    "namaWilayah": "Jawa Barat",
+    "levelWilayah": "PROVINSI",
+    "tahun": 2024,
+    "kategori": "WILAYAH",
+    "indikator": "LUAS_WILAYAH",
+    "nilai": 35377.76,
+    "satuan": "KM2",
+    "metadata": {
+      "sumberPublikasi": "BIG / BPS"
+    }
+  }
+]

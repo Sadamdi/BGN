@@ -81,7 +81,11 @@ export default function DistribusiListPage() {
     {
       title: "Bukti",
       dataIndex: "fotoBuktiUrl",
-      render: (url) => url ? <a href={(import.meta.env.VITE_SOCKET_URL || "http://localhost:3000") + url} target="_blank" rel="noreferrer"><FileImageOutlined /></a> : "-",
+      render: (url) => {
+        if (!url) return "-";
+        const base = import.meta.env.VITE_SOCKET_URL || (import.meta.env.DEV ? "http://localhost:3000" : window.location.origin);
+        return <a href={base + url} target="_blank" rel="noreferrer"><FileImageOutlined /></a>;
+      },
     },
     {
       title: "Aksi",
