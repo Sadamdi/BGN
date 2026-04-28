@@ -1,0 +1,382 @@
+import React, { useEffect, useRef, useState, useMemo } from "react";
+import {
+  Row,
+  Col,
+  Card,
+  Statistic,
+  Spin,
+  Skeleton,
+  Tag,
+  Button,
+  Progress,
+  List,
+  Empty,
+  Alert,
+  Space,
+} from "antd";
+import {
+  TeamOutlined,
+  ShoppingOutlined,
+  BankOutlined,
+  AlertOutlined,
+  ArrowUpOutlined,
+  ArrowDownOutlined,
+  ReloadOutlined,
+  DownloadOutlined,
+} from "@ant-design/icons";
+import {
+  AreaChart,
+  Area,
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  XAxis,
+  YAxis,
+  Tooltip as RTooltip,
+  Legend,
+  CartesianGrid,
+} from "recharts";
+import { MapContainer, TileLayer, CircleMarker, Popup } from "react-leaflet";
+import dayjs from "dayjs";
+import html2canvas from "html2canvas";
+
+import PageHeader from "../components/layout/PageHeader";
+import * as dashApi from "../api/dashboard.api";
+
+const RANGE_OPTIONS = [
+  { value: 7, label: "7 Hari" },
+  { value: 30, label: "30 Hari" },
+  { value: 90, label: "90 Hari" },
+];
+
+const KATEGORI_COLOR = {
+  PESERTA_DIDIK: "#1B3A6B",
+  BALITA: "#52c41a",
+  IBU_HAMIL: "#fa8c16",
+  IBU_MENYUSUI: "#722ed1",
+};
+
+const KATEGORI_LABEL = {
+  PESERTA_DIDIK: "Peserta Didik",
+  BALITA: "Balita",
+  IBU_HAMIL: "Ibu Hamil",
+  IBU_MENYUSUI: "Ibu Menyusui",
+};
+
+export default function DashboardPage() {
+  const containerRef = useRef(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [stat, setStat] = useState(null);
+  const [tren, setTren] = useState([]);
+  const [range, setRange] = useState(30);
+  const [sebaran, setSebaran] = useState([]);
+  const [kategori, setKategori] = useState({});
+  const [alert, setAlert] = useState({ sppgBelumLapor: [], sppgRealisasiRendah: [], penerimaGiziBermasalah: [] });
+  const [terakhir, setTerakhir] = useState(null);
+
+  const fetchAll = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [s, t, sb, k, a] = await Promise.all([
+        dashApi.getStatistik(),
+        dashApi.getTrenDistribusi(range),
+        dashApi.getSebaranSppg(),
+        dashApi.getDistribusiKategori(),
+        dashApi.getAlert(),
+      ]);
+      setStat(s.data);
+      setTren(t.data);
+      setSebaran(sb.data);
+      setKategori(k.data);
+      setAlert(a.data);
+      setTerakhir(new Date());
+    } catch (err) {
+      setError((err.response && err.response.data && err.response.data.message) || "Gagal memuat dashboard");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAll();
+    const id = setInterval(fetchAll, 5 * 60 * 1000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [range]);
+
+  const cakupanColor = useMemo(() => {
+    const v = (stat && stat.persentaseCakupan) || 0;
+    if (v >= 80) return "#52c41a";
+    if (v >= 60) return "#faad14";
+    return "#ff4d4f";
+  }, [stat]);
+
+  const pieData = useMemo(
+    () =>
+      Object.entries(kategori || {}).map(([k, v]) => ({
+        name: KATEGORI_LABEL[k] || k,
+        value: v,
+        color: KATEGORI_COLOR[k] || "#8884d8",
+      })),
+    [kategori]
+  );
+  const totalKategori = pieData.reduce((s, x) => s + (x.value || 0), 0);
+
+  const onUnduh = async () => {
+    if (!containerRef.current) return;
+    const canvas = await html2canvas(containerRef.current, { scale: 2, useCORS: true });
+    const a = document.createElement("a");
+    a.download = "Dashboard_SIPGN_" + dayjs().format("YYYYMMDD_HHmm") + ".png";
+    a.href = canvas.toDataURL("image/png");
+    a.click();
+  };
+
+  return (
+    <div ref={containerRef}>
+      <PageHeader
+        title="Dashboard SIPGN-BGN"
+        subtitle={
+          terakhir
+            ? "Diperbarui: " + dayjs(terakhir).format("DD MMM YYYY HH:mm")
+            : "Memuat data..."
+        }
+        actions={
+          <Space>
+            <Button icon={<ReloadOutlined />} onClick={fetchAll} loading={loading}>
+              Refresh
+            </Button>
+            <Button icon={<DownloadOutlined />} onClick={onUnduh}>
+              Unduh Snapshot
+            </Button>
+          </Space>
+        }
+      />
+
+      {error ? <Alert type="error" message={error} showIcon style={{ marginBottom: 12 }} /> : null}
+
+      {loading && !stat ? (
+        <Skeleton active paragraph={{ rows: 6 }} />
+      ) : (
+        <>
+          <Row gutter={[16, 16]}>
+            <Col xs={24} sm={12} md={8} lg={5}>
+              <Card className="bgn-stat-card">
+                <Statistic
+                  title="Total Penerima Manfaat"
+                  value={stat ? stat.totalPenerima : 0}
+                  prefix={<TeamOutlined style={{ color: "#1B3A6B" }} />}
+                />
+              </Card>
+            </Col>
+            <Col xs={24} sm={12} md={8} lg={5}>
+              <Card className="bgn-stat-card">
+                <Statistic
+                  title="Distribusi Hari Ini"
+                  value={stat ? stat.distribusiHariIni : 0}
+                  prefix={<ShoppingOutlined style={{ color: "#52c41a" }} />}
+                  suffix="porsi"
+                />
+                <div style={{ marginTop: 6, fontSize: 12 }}>
+                  {stat && stat.perubahanDistribusi >= 0 ? (
+                    <span style={{ color: "#52c41a" }}>
+                      <ArrowUpOutlined /> {stat.perubahanDistribusi.toFixed(1)}% vs kemarin
+                    </span>
+                  ) : (
+                    <span style={{ color: "#ff4d4f" }}>
+                      <ArrowDownOutlined /> {(stat && Math.abs(stat.perubahanDistribusi).toFixed(1)) || 0}% vs kemarin
+                    </span>
+                  )}
+                </div>
+              </Card>
+            </Col>
+            <Col xs={24} sm={12} md={8} lg={5}>
+              <Card className="bgn-stat-card">
+                <Statistic
+                  title="SPPG Aktif"
+                  value={stat ? stat.jumlahSppgAktif : 0}
+                  prefix={<BankOutlined style={{ color: "#722ed1" }} />}
+                />
+              </Card>
+            </Col>
+            <Col xs={24} sm={12} md={8} lg={5}>
+              <Card className="bgn-stat-card" title="Cakupan Target">
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <Progress
+                    type="circle"
+                    size={70}
+                    percent={stat ? Math.min(100, Math.round(stat.persentaseCakupan || 0)) : 0}
+                    strokeColor={cakupanColor}
+                  />
+                  <div style={{ fontSize: 12, color: "#475569" }}>
+                    Total realisasi vs kapasitas SPPG aktif hari ini
+                  </div>
+                </div>
+              </Card>
+            </Col>
+            <Col xs={24} sm={12} md={8} lg={4}>
+              <Card className="bgn-stat-card" style={{ borderColor: stat && stat.alertGiziBuruk > 0 ? "#ffccc7" : undefined }}>
+                <Statistic
+                  title="Alert Gizi Buruk/Kurang"
+                  value={stat ? stat.alertGiziBuruk : 0}
+                  prefix={<AlertOutlined style={{ color: "#ff4d4f" }} />}
+                />
+                <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>30 hari terakhir</div>
+              </Card>
+            </Col>
+          </Row>
+
+          <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+            <Col xs={24} lg={16}>
+              <Card
+                title="Tren Distribusi MBG"
+                extra={
+                  <Space>
+                    {RANGE_OPTIONS.map((r) => (
+                      <Button
+                        key={r.value}
+                        size="small"
+                        type={range === r.value ? "primary" : "default"}
+                        onClick={() => setRange(r.value)}
+                      >
+                        {r.label}
+                      </Button>
+                    ))}
+                  </Space>
+                }
+              >
+                <div style={{ width: "100%", height: 320 }}>
+                  <ResponsiveContainer>
+                    <AreaChart data={tren.map((d) => ({ ...d, label: dayjs(d.tanggal).format("DD/MM") }))}>
+                      <defs>
+                        <linearGradient id="colorBgn" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#1B3A6B" stopOpacity={0.7} />
+                          <stop offset="95%" stopColor="#1B3A6B" stopOpacity={0.05} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis dataKey="label" />
+                      <YAxis />
+                      <RTooltip
+                        formatter={(value) => [value + " porsi", "Total"]}
+                        labelFormatter={(_, p) => (p && p[0] ? dayjs(p[0].payload.tanggal).format("DD MMM YYYY") : "")}
+                      />
+                      <Area type="monotone" dataKey="totalPorsi" stroke="#1B3A6B" fill="url(#colorBgn)" strokeWidth={2} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </Card>
+            </Col>
+            <Col xs={24} lg={8}>
+              <Card title="Distribusi Penerima per Kategori">
+                <div style={{ width: "100%", height: 280 }}>
+                  <ResponsiveContainer>
+                    <PieChart>
+                      <Pie
+                        data={pieData}
+                        dataKey="value"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={90}
+                        labelLine={false}
+                      >
+                        {pieData.map((entry, i) => (
+                          <Cell key={i} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <RTooltip />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div style={{ textAlign: "center", marginTop: -180, fontWeight: 600 }}>
+                  Total: {totalKategori}
+                </div>
+              </Card>
+            </Col>
+          </Row>
+
+          <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+            <Col xs={24} lg={14}>
+              <Card title="Sebaran SPPG" bodyStyle={{ padding: 0 }}>
+                <div style={{ height: 420 }}>
+                  <MapContainer center={[-2.5, 118]} zoom={5} style={{ height: "100%", width: "100%" }}>
+                    <TileLayer attribution="&copy; OpenStreetMap" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                    {sebaran
+                      .filter((s) => s.latitude && s.longitude)
+                      .map((s) => (
+                        <CircleMarker
+                          key={s.id}
+                          center={[s.latitude, s.longitude]}
+                          radius={8}
+                          pathOptions={{
+                            color: !s.statusAktif ? "#ff4d4f" : s.distribusiKemarin === 0 ? "#faad14" : "#52c41a",
+                            fillOpacity: 0.85,
+                          }}
+                        >
+                          <Popup>
+                            <div style={{ minWidth: 180 }}>
+                              <div style={{ fontWeight: 700 }}>{s.namaSppg}</div>
+                              <div>Provinsi: {s.provinsi}</div>
+                              <div>Kapasitas: {s.kapasitas} porsi/hari</div>
+                              <div>Distribusi kemarin: {s.distribusiKemarin}</div>
+                              <div>Penerima aktif: {s.jumlahPenerima}</div>
+                            </div>
+                          </Popup>
+                        </CircleMarker>
+                      ))}
+                  </MapContainer>
+                </div>
+              </Card>
+            </Col>
+            <Col xs={24} lg={10}>
+              <Card title="Alert & Notifikasi" style={{ height: 420, overflow: "auto" }}>
+                {(alert.sppgBelumLapor || []).length > 0 ? (
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ fontWeight: 600, marginBottom: 6 }}>SPPG belum lapor 2 hari berturut-turut</div>
+                    <List
+                      size="small"
+                      dataSource={alert.sppgBelumLapor.slice(0, 5)}
+                      renderItem={(s) => (
+                        <List.Item style={{ background: "#FFF7E6", borderRadius: 6, padding: 8 }}>
+                          <span>{s.namaSppg}</span>
+                          <Tag color="orange">{s.provinsi}</Tag>
+                        </List.Item>
+                      )}
+                    />
+                  </div>
+                ) : null}
+
+                {(alert.penerimaGiziBermasalah || []).length > 0 ? (
+                  <div>
+                    <div style={{ fontWeight: 600, marginBottom: 6 }}>Penerima dengan status gizi bermasalah</div>
+                    <List
+                      size="small"
+                      dataSource={alert.penerimaGiziBermasalah.slice(0, 5)}
+                      renderItem={(g) => (
+                        <List.Item style={{ background: "#FFE0E0", borderRadius: 6, padding: 8 }}>
+                          <div>
+                            <div style={{ fontWeight: 600 }}>{g.nama}</div>
+                            <div style={{ fontSize: 11, color: "#64748b" }}>{g.sppg}</div>
+                          </div>
+                          <Tag color={g.statusGizi === "GIZI_BURUK" ? "red" : "gold"}>{g.statusGizi}</Tag>
+                        </List.Item>
+                      )}
+                    />
+                  </div>
+                ) : null}
+
+                {(alert.sppgBelumLapor || []).length === 0 && (alert.penerimaGiziBermasalah || []).length === 0 ? (
+                  <Empty description="Tidak ada alert" />
+                ) : null}
+              </Card>
+            </Col>
+          </Row>
+        </>
+      )}
+    </div>
+  );
+}

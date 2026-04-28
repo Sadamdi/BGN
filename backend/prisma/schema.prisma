@@ -1,0 +1,236 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearch", "fullTextIndex"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Peran {
+  ADMIN
+  PENGAWAS_GIZI
+  OPERATOR_SPPG
+  ASISTEN_LAPANGAN
+  PEJABAT_BGN
+}
+
+enum JenisKelamin {
+  LAKI_LAKI
+  PEREMPUAN
+}
+
+enum Kategori {
+  PESERTA_DIDIK
+  BALITA
+  IBU_HAMIL
+  IBU_MENYUSUI
+}
+
+enum StatusGizi {
+  GIZI_BURUK
+  GIZI_KURANG
+  GIZI_BAIK
+  GIZI_LEBIH
+}
+
+enum StatusDistribusi {
+  DRAFT
+  TERKONFIRMASI
+  TERVALIDASI
+}
+
+enum JadwalFrekuensi {
+  MINGGUAN
+  BULANAN
+}
+
+model Pengguna {
+  id            String   @id @default(uuid())
+  username      String   @unique @db.VarChar(50)
+  email         String   @unique @db.VarChar(100)
+  passwordHash  String   @map("password_hash")
+  namaLengkap   String   @map("nama_lengkap") @db.VarChar(150)
+  peran         Peran
+  sppgId        String?  @map("sppg_id")
+  wilayahZona   String?  @map("wilayah_zona") @db.VarChar(100)
+  statusAktif   Boolean  @default(true) @map("status_aktif")
+  terakhirLogin DateTime? @map("terakhir_login")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  sppg                       Sppg?               @relation(fields: [sppgId], references: [id])
+  distribusiSebagaiOperator  DistribusiMbg[]     @relation("DistribusiOperator")
+  distribusiSebagaiValidator DistribusiMbg[]     @relation("DistribusiValidator")
+  pemantauanGizi             PemantauanGizi[]
+  auditTrail                 AuditTrail[]
+  notifikasi                 Notifikasi[]
+  jadwalLaporanDibuat        JadwalLaporan[]     @relation("JadwalDibuatOleh")
+
+  @@index([peran])
+  @@index([sppgId])
+  @@map("pengguna")
+}
+
+model Sppg {
+  id                    String   @id @default(uuid())
+  kodeSppg              String   @unique @map("kode_sppg") @db.VarChar(20)
+  namaSppg              String   @map("nama_sppg") @db.VarChar(200)
+  alamat                String   @db.Text
+  latitude              Decimal? @db.Decimal(10, 7)
+  longitude             Decimal? @db.Decimal(10, 7)
+  provinsi              String   @db.VarChar(100)
+  kabupatenKota         String   @map("kabupaten_kota") @db.VarChar(100)
+  kecamatan             String?  @db.VarChar(100)
+  kapasitasPorsiPerHari Int      @map("kapasitas_porsi_per_hari")
+  mitraPengelola        String?  @map("mitra_pengelola") @db.VarChar(150)
+  kontakPenanggungJawab String?  @map("kontak_penanggung_jawab") @db.VarChar(150)
+  telepon               String?  @db.VarChar(20)
+  statusAktif           Boolean  @default(true) @map("status_aktif")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  pengguna        Pengguna[]
+  penerimaManfaat PenerimaManfaat[]
+  distribusiMbg   DistribusiMbg[]
+
+  @@index([provinsi])
+  @@index([statusAktif])
+  @@map("sppg")
+}
+
+model PenerimaManfaat {
+  id                String       @id @default(uuid())
+  nikEnc            String       @map("nik_enc") @db.Text
+  nikHash           String       @map("nik_hash") @db.VarChar(64)
+  nikMasked         String       @map("nik_masked") @db.VarChar(20)
+  namaLengkap       String       @map("nama_lengkap") @db.VarChar(150)
+  tanggalLahir      DateTime     @map("tanggal_lahir") @db.Date
+  jenisKelamin      JenisKelamin @map("jenis_kelamin")
+  kategori          Kategori
+  satuanPendidikan  String?      @map("satuan_pendidikan") @db.VarChar(150)
+  sppgId            String       @map("sppg_id")
+  statusAktif       Boolean      @default(true) @map("status_aktif")
+  createdAt         DateTime     @default(now()) @map("created_at")
+  updatedAt         DateTime     @updatedAt @map("updated_at")
+
+  sppg           Sppg             @relation(fields: [sppgId], references: [id])
+  pemantauanGizi PemantauanGizi[]
+
+  @@unique([nikHash, sppgId])
+  @@index([sppgId])
+  @@index([kategori])
+  @@index([namaLengkap])
+  @@map("penerima_manfaat")
+}
+
+model DistribusiMbg {
+  id                 String           @id @default(uuid())
+  sppgId             String           @map("sppg_id")
+  tanggalDistribusi  DateTime         @map("tanggal_distribusi") @db.Date
+  porsiPesertaDidik  Int              @default(0) @map("porsi_peserta_didik")
+  porsiBalita        Int              @default(0) @map("porsi_balita")
+  porsiIbuHamil      Int              @default(0) @map("porsi_ibu_hamil")
+  porsiIbuMenyusui   Int              @default(0) @map("porsi_ibu_menyusui")
+  totalPorsi         Int              @default(0) @map("total_porsi")
+  status             StatusDistribusi @default(DRAFT)
+  fotoBuktiUrl       String?          @map("foto_bukti_url") @db.Text
+  catatan            String?          @db.Text
+  operatorId         String           @map("operator_id")
+  validatorId        String?          @map("validator_id")
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
+
+  sppg      Sppg      @relation(fields: [sppgId], references: [id])
+  operator  Pengguna  @relation("DistribusiOperator", fields: [operatorId], references: [id])
+  validator Pengguna? @relation("DistribusiValidator", fields: [validatorId], references: [id])
+
+  @@unique([sppgId, tanggalDistribusi])
+  @@index([tanggalDistribusi])
+  @@index([status])
+  @@map("distribusi_mbg")
+}
+
+model PemantauanGizi {
+  id                String     @id @default(uuid())
+  penerimaId        String     @map("penerima_id")
+  tanggalPengukuran DateTime   @map("tanggal_pengukuran") @db.Date
+  beratBadanKg      Decimal?   @map("berat_badan_kg") @db.Decimal(5, 2)
+  tinggiBadanCm     Decimal?   @map("tinggi_badan_cm") @db.Decimal(5, 2)
+  lilaCm            Decimal?   @map("lila_cm") @db.Decimal(4, 2)
+  usiaBulan         Int?       @map("usia_bulan")
+  zscoreBbU         Decimal?   @map("zscore_bb_u") @db.Decimal(5, 2)
+  zscoreTbU         Decimal?   @map("zscore_tb_u") @db.Decimal(5, 2)
+  zscoreBbTb        Decimal?   @map("zscore_bb_tb") @db.Decimal(5, 2)
+  statusGizi        StatusGizi @map("status_gizi")
+  stunting          Boolean    @default(false)
+  petugasId         String     @map("petugas_id")
+  catatan           String?    @db.Text
+  createdAt         DateTime   @default(now()) @map("created_at")
+
+  penerima PenerimaManfaat @relation(fields: [penerimaId], references: [id])
+  petugas  Pengguna        @relation(fields: [petugasId], references: [id])
+
+  @@index([penerimaId])
+  @@index([tanggalPengukuran])
+  @@index([statusGizi])
+  @@map("pemantauan_gizi")
+}
+
+model AuditTrail {
+  id          String   @id @default(uuid())
+  tabel       String   @db.VarChar(80)
+  recordId    String   @map("record_id")
+  aksi        String   @db.VarChar(20)
+  dataLama    Json?    @map("data_lama")
+  dataBaru    Json?    @map("data_baru")
+  penggunaId  String?  @map("pengguna_id")
+  ipAddress   String?  @map("ip_address") @db.VarChar(64)
+  userAgent   String?  @map("user_agent") @db.VarChar(255)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  pengguna Pengguna? @relation(fields: [penggunaId], references: [id])
+
+  @@index([tabel, recordId])
+  @@index([penggunaId])
+  @@index([createdAt])
+  @@map("audit_trail")
+}
+
+model Notifikasi {
+  id         String   @id @default(uuid())
+  penggunaId String   @map("pengguna_id")
+  jenis      String   @db.VarChar(50)
+  judul      String   @db.VarChar(200)
+  pesan      String   @db.Text
+  data       Json?
+  dibaca     Boolean  @default(false)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  pengguna Pengguna @relation(fields: [penggunaId], references: [id])
+
+  @@index([penggunaId, dibaca])
+  @@index([createdAt])
+  @@map("notifikasi")
+}
+
+model JadwalLaporan {
+  id            String          @id @default(uuid())
+  jenisLaporan  String          @map("jenis_laporan") @db.VarChar(80)
+  frekuensi     JadwalFrekuensi
+  hari          Int?
+  tanggal       Int?
+  jam           String          @default("06:00") @db.VarChar(5)
+  emailTujuan   String[]        @map("email_tujuan")
+  filterJson    Json?           @map("filter_json")
+  aktif         Boolean         @default(true)
+  dibuatOlehId  String          @map("dibuat_oleh_id")
+  terakhirJalan DateTime?       @map("terakhir_jalan")
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+
+  dibuatOleh Pengguna @relation("JadwalDibuatOleh", fields: [dibuatOlehId], references: [id])
+
+  @@map("jadwal_laporan")
+}

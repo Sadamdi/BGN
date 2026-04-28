@@ -1,0 +1,20 @@
+{
+  "name": "sipgn-bgn",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sistem Informasi Pemenuhan Gizi Nasional (SIPGN-BGN) - monorepo",
+  "workspaces": [
+    "shared",
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev:backend": "npm --workspace backend run dev",
+    "dev:frontend": "npm --workspace frontend run dev",
+    "build:frontend": "npm --workspace frontend run build",
+    "test:backend": "npm --workspace backend test",
+    "test:frontend": "npm --workspace frontend test",
+    "prisma:migrate": "npm --workspace backend run prisma:migrate",
+    "prisma:seed": "npm --workspace backend run prisma:seed"
+  }
+}

@@ -1,0 +1,246 @@
+"use strict";
+
+const dayjs = require("dayjs");
+const { prisma } = require("../config/database");
+const { startOfDay, endOfDay } = require("../utils/dateRange");
+const { buildSppgFilter } = require("../middleware/rbac");
+const { kirimEmail } = require("./email.service");
+const excelService = require("./excel.service");
+
+const MAX_ROWS = 50000;
+
+function buildAccessFilter(user, extra = {}) {
+  const f = buildSppgFilter(user);
+  if (f.sppgId) return { ...extra, sppgId: f.sppgId };
+  if (f.sppg) return { ...extra, sppg: f.sppg };
+  return extra;
+}
+
+async function fetchDistribusi({ user, filter }) {
+  const where = buildAccessFilter(user, {});
+  if (filter.sppgId) where.sppgId = filter.sppgId;
+  if (filter.provinsi) where.sppg = { provinsi: filter.provinsi };
+  if (filter.periodeAwal || filter.periodeAkhir) {
+    where.tanggalDistribusi = {};
+    if (filter.periodeAwal) where.tanggalDistribusi.gte = startOfDay(filter.periodeAwal);
+    if (filter.periodeAkhir) where.tanggalDistribusi.lte = endOfDay(filter.periodeAkhir);
+  }
+  return prisma.distribusiMbg.findMany({
+    where,
+    take: MAX_ROWS,
+    include: { sppg: { select: { kodeSppg: true, namaSppg: true, provinsi: true } } },
+    orderBy: { tanggalDistribusi: "desc" },
+  });
+}
+
+async function previewDistribusi({ user, filter }) {
+  const rows = await fetchDistribusi({ user, filter });
+  const totalPorsi = rows.reduce((s, r) => s + r.totalPorsi, 0);
+  return {
+    totalRows: rows.length,
+    summary: {
+      "Total Laporan": rows.length,
+      "Total Porsi": totalPorsi,
+      "Total Peserta Didik": rows.reduce((s, r) => s + r.porsiPesertaDidik, 0),
+      "Total Balita": rows.reduce((s, r) => s + r.porsiBalita, 0),
+      "Total Ibu Hamil": rows.reduce((s, r) => s + r.porsiIbuHamil, 0),
+      "Total Ibu Menyusui": rows.reduce((s, r) => s + r.porsiIbuMenyusui, 0),
+    },
+    rows: rows.slice(0, 100),
+  };
+}
+
+async function exportDistribusi({ user, filter }) {
+  const rows = await fetchDistribusi({ user, filter });
+  if (rows.length > MAX_ROWS) {
+    const e = new Error("Data melebihi batas 50.000 baris. Persempit filter.");
+    e.statusCode = 413;
+    e.code = "TOO_MANY_ROWS";
+    throw e;
+  }
+  const summary = {
+    "Total Laporan": rows.length,
+    "Total Porsi": rows.reduce((s, r) => s + r.totalPorsi, 0),
+  };
+  return excelService.generateLaporanDistribusi({ rows, summary, filter });
+}
+
+async function fetchStatusGizi({ user, filter }) {
+  const where = {};
+  if (filter.sppgId) where.penerima = { sppgId: filter.sppgId };
+  else if (filter.provinsi) where.penerima = { sppg: { provinsi: filter.provinsi } };
+  else {
+    const f = buildSppgFilter(user);
+    if (f.sppgId) where.penerima = { sppgId: f.sppgId };
+    else if (f.sppg) where.penerima = { sppg: f.sppg };
+  }
+  if (filter.periodeAwal || filter.periodeAkhir) {
+    where.tanggalPengukuran = {};
+    if (filter.periodeAwal) where.tanggalPengukuran.gte = startOfDay(filter.periodeAwal);
+    if (filter.periodeAkhir) where.tanggalPengukuran.lte = endOfDay(filter.periodeAkhir);
+  }
+  return prisma.pemantauanGizi.findMany({
+    where,
+    take: MAX_ROWS,
+    include: {
+      penerima: {
+        select: {
+          namaLengkap: true,
+          nikMasked: true,
+          kategori: true,
+          sppg: { select: { namaSppg: true, provinsi: true } },
+        },
+      },
+    },
+    orderBy: { tanggalPengukuran: "desc" },
+  });
+}
+
+async function previewStatusGizi({ user, filter }) {
+  const rows = await fetchStatusGizi({ user, filter });
+  const list = rows.map((r) => ({
+    namaLengkap: r.penerima.namaLengkap,
+    nikMasked: r.penerima.nikMasked,
+    kategori: r.penerima.kategori,
+    sppgNama: r.penerima.sppg && r.penerima.sppg.namaSppg,
+    sppgProvinsi: r.penerima.sppg && r.penerima.sppg.provinsi,
+    tanggalPengukuran: r.tanggalPengukuran,
+    beratBadanKg: r.beratBadanKg,
+    tinggiBadanCm: r.tinggiBadanCm,
+    lilaCm: r.lilaCm,
+    zscoreBbU: r.zscoreBbU,
+    zscoreTbU: r.zscoreTbU,
+    statusGizi: r.statusGizi,
+    stunting: r.stunting,
+  }));
+
+  const total = list.length;
+  const buruk = list.filter((x) => x.statusGizi === "GIZI_BURUK").length;
+  const kurang = list.filter((x) => x.statusGizi === "GIZI_KURANG").length;
+  const stunting = list.filter((x) => x.stunting).length;
+  return {
+    totalRows: total,
+    summary: {
+      "Total Pengukuran": total,
+      "Gizi Buruk": buruk,
+      "Gizi Kurang": kurang,
+      "Stunting": stunting,
+    },
+    rows: list.slice(0, 100),
+    fullRows: list,
+  };
+}
+
+async function exportStatusGizi({ user, filter }) {
+  const data = await previewStatusGizi({ user, filter });
+  if (data.fullRows.length > MAX_ROWS) {
+    const e = new Error("Data melebihi 50.000 baris");
+    e.statusCode = 413;
+    throw e;
+  }
+  return excelService.generateLaporanStatusGizi({ rows: data.fullRows, filter });
+}
+
+async function exportKinerjaSppg({ user, filter }) {
+  const where = buildAccessFilter(user, { statusAktif: true });
+  if (filter.provinsi) where.provinsi = filter.provinsi;
+
+  const sppgs = await prisma.sppg.findMany({
+    where,
+    include: { _count: { select: { penerimaManfaat: { where: { statusAktif: true } } } } },
+  });
+  const since = filter.periodeAwal ? startOfDay(filter.periodeAwal) : dayjs().subtract(30, "day").startOf("day").toDate();
+  const ids = sppgs.map((s) => s.id);
+  const dist = await prisma.distribusiMbg.findMany({
+    where: { sppgId: { in: ids }, tanggalDistribusi: { gte: since } },
+    select: { sppgId: true, totalPorsi: true },
+  });
+  const map = new Map();
+  for (const d of dist) {
+    const cur = map.get(d.sppgId) || { sum: 0, n: 0 };
+    cur.sum += d.totalPorsi;
+    cur.n += 1;
+    map.set(d.sppgId, cur);
+  }
+  const rows = sppgs.map((s) => {
+    const c = map.get(s.id) || { sum: 0, n: 0 };
+    const rata = c.n > 0 ? c.sum / c.n : 0;
+    const realisasi = s.kapasitasPorsiPerHari > 0 ? (rata / s.kapasitasPorsiPerHari) * 100 : 0;
+    return {
+      kodeSppg: s.kodeSppg,
+      namaSppg: s.namaSppg,
+      provinsi: s.provinsi,
+      kapasitas: s.kapasitasPorsiPerHari,
+      rataRata: Math.round(rata),
+      realisasiPersen: Math.round(realisasi * 100) / 100,
+      penerimaAktif: s._count.penerimaManfaat,
+      statusAktif: s.statusAktif,
+    };
+  });
+  return excelService.generateLaporanKinerjaSppg({ rows, filter });
+}
+
+async function exportPenerima({ user, filter }) {
+  const where = buildAccessFilter(user, {});
+  if (filter.kategori) where.kategori = filter.kategori;
+  if (filter.provinsi) where.sppg = { provinsi: filter.provinsi };
+
+  const data = await prisma.penerimaManfaat.findMany({
+    where,
+    take: MAX_ROWS,
+    include: { sppg: { select: { namaSppg: true, provinsi: true } } },
+    orderBy: { namaLengkap: "asc" },
+  });
+  const rows = data.map((p) => ({
+    nikMasked: p.nikMasked,
+    namaLengkap: p.namaLengkap,
+    tanggalLahir: p.tanggalLahir,
+    jenisKelamin: p.jenisKelamin,
+    kategori: p.kategori,
+    sppgNama: p.sppg && p.sppg.namaSppg,
+    sppgProvinsi: p.sppg && p.sppg.provinsi,
+    statusAktif: p.statusAktif,
+  }));
+  return excelService.generateLaporanPenerima({ rows, filter });
+}
+
+async function jalankanJadwalAktif() {
+  const now = dayjs();
+  const jadwal = await prisma.jadwalLaporan.findMany({ where: { aktif: true } });
+  for (const j of jadwal) {
+    try {
+      const [hh, mm] = (j.jam || "06:00").split(":");
+      if (Number(hh) !== now.hour()) continue;
+      if (j.frekuensi === "MINGGUAN" && Number.isFinite(j.hari) && now.day() !== j.hari) continue;
+      if (j.frekuensi === "BULANAN" && Number.isFinite(j.tanggal) && now.date() !== j.tanggal) continue;
+      if (j.terakhirJalan && dayjs(j.terakhirJalan).isAfter(now.subtract(20, "minute"))) continue;
+
+      // Snapshot summary
+      const filter = j.filterJson || {};
+      const summary = await previewDistribusi({ user: { peran: "ADMIN" }, filter });
+      const ringkas = "Total porsi: " + (summary.summary["Total Porsi"] || 0) + ", Total laporan: " + (summary.summary["Total Laporan"] || 0);
+      for (const to of (j.emailTujuan || [])) {
+        await kirimEmail({
+          to,
+          subject: "[SIPGN-BGN] Laporan Terjadwal: " + j.jenisLaporan,
+          html: `<p>Ringkasan ${j.jenisLaporan} ${now.format("DD MMM YYYY")}:</p><p>${ringkas}</p>`,
+          text: ringkas,
+        });
+      }
+      await prisma.jadwalLaporan.update({ where: { id: j.id }, data: { terakhirJalan: now.toDate() } });
+    } catch (e) {
+      console.error("[laporan] jadwal", j.id, e.message);
+    }
+  }
+}
+
+module.exports = {
+  previewDistribusi,
+  exportDistribusi,
+  previewStatusGizi,
+  exportStatusGizi,
+  exportKinerjaSppg,
+  exportPenerima,
+  jalankanJadwalAktif,
+  MAX_ROWS,
+};
