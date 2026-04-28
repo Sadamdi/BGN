@@ -1,0 +1,42 @@
+[
+  {
+    "kodeWilayah": "31",
+    "namaWilayah": "DKI Jakarta",
+    "levelWilayah": "PROVINSI",
+    "tahun": 2023,
+    "kategori": "GIZI",
+    "indikator": "PREVALENSI_STUNTING",
+    "nilai": 17.6,
+    "satuan": "PERSEN",
+    "metadata": {
+      "sumberPublikasi": "SSGI/Kemenkes (agregat publik)",
+      "catatan": "Nilai agregat sampel untuk bootstrap analitik."
+    }
+  },
+  {
+    "kodeWilayah": "32",
+    "namaWilayah": "Jawa Barat",
+    "levelWilayah": "PROVINSI",
+    "tahun": 2023,
+    "kategori": "GIZI",
+    "indikator": "PREVALENSI_STUNTING",
+    "nilai": 21.7,
+    "satuan": "PERSEN",
+    "metadata": {
+      "sumberPublikasi": "Open Data Jawa Barat (agregat publik)"
+    }
+  },
+  {
+    "kodeWilayah": "35",
+    "namaWilayah": "Jawa Timur",
+    "levelWilayah": "PROVINSI",
+    "tahun": 2023,
+    "kategori": "GIZI",
+    "indikator": "PREVALENSI_STUNTING",
+    "nilai": 17.7,
+    "satuan": "PERSEN",
+    "metadata": {
+      "sumberPublikasi": "BPS/Kemenkes (agregat publik)"
+    }
+  }
+]

@@ -105,3 +105,24 @@ describe("auth.service.refreshAccessToken", () => {
     await expect(auth.refreshAccessToken("garbage")).rejects.toMatchObject({ statusCode: 401 });
   });
 });
+
+describe("auth.service reset password hybrid", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test("verify otp gagal saat kode salah", async () => {
+    prisma.pengguna.findUnique.mockResolvedValue({
+      id: "u-reset-1",
+      email: "u@b.id",
+      namaLengkap: "User Reset",
+    });
+    await auth.forgotPassword("u@b.id");
+    const redis = require("../../config/redis").getRedis();
+    const keys = [...redis.get.mock.calls.map((x) => x[0]), ...redis.set.mock.calls.map((x) => x[0])];
+    const resetKey = keys.find((k) => String(k).startsWith("reset:"));
+    const token = String(resetKey).replace("reset:", "");
+
+    await expect(auth.verifyResetOtp({ token, otp: "000000" })).rejects.toMatchObject({ code: "INVALID_OTP" });
+  });
+});

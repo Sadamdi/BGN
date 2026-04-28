@@ -43,6 +43,7 @@ import html2canvas from "html2canvas";
 
 import PageHeader from "../components/layout/PageHeader";
 import * as dashApi from "../api/dashboard.api";
+import * as publicDataApi from "../api/publicData.api";
 
 const RANGE_OPTIONS = [
   { value: 7, label: "7 Hari" },
@@ -74,6 +75,7 @@ export default function DashboardPage() {
   const [sebaran, setSebaran] = useState([]);
   const [kategori, setKategori] = useState({});
   const [alert, setAlert] = useState({ sppgBelumLapor: [], sppgRealisasiRendah: [], penerimaGiziBermasalah: [] });
+  const [indikatorPublik, setIndikatorPublik] = useState([]);
   const [terakhir, setTerakhir] = useState(null);
 
   const fetchAll = async () => {
@@ -87,11 +89,13 @@ export default function DashboardPage() {
         dashApi.getDistribusiKategori(),
         dashApi.getAlert(),
       ]);
+      const publik = await publicDataApi.getRingkasanPublik(dayjs().year());
       setStat(s.data);
       setTren(t.data);
       setSebaran(sb.data);
       setKategori(k.data);
       setAlert(a.data);
+      setIndikatorPublik((publik && publik.data) || []);
       setTerakhir(new Date());
     } catch (err) {
       setError((err.response && err.response.data && err.response.data.message) || "Gagal memuat dashboard");
@@ -372,6 +376,36 @@ export default function DashboardPage() {
                 {(alert.sppgBelumLapor || []).length === 0 && (alert.penerimaGiziBermasalah || []).length === 0 ? (
                   <Empty description="Tidak ada alert" />
                 ) : null}
+              </Card>
+            </Col>
+          </Row>
+
+          <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+            <Col span={24}>
+              <Card title="Indikator Publik Pendukung MBG (Open Data)">
+                {indikatorPublik.length === 0 ? (
+                  <Empty description="Belum ada data publik terintegrasi" />
+                ) : (
+                  <List
+                    size="small"
+                    dataSource={indikatorPublik.slice(0, 12)}
+                    renderItem={(item) => (
+                      <List.Item>
+                        <Space style={{ width: "100%", justifyContent: "space-between" }}>
+                          <div>
+                            <strong>{item.indikator}</strong> - {item.namaWilayah}
+                            <div style={{ fontSize: 12, color: "#64748b" }}>
+                              {item.kategori} | {item.levelWilayah} | {item.tahun} | sumber: {item.sumber?.nama || "-"}
+                            </div>
+                          </div>
+                          <Tag color="blue">
+                            {Number(item.nilai).toLocaleString("id-ID")} {item.satuan || ""}
+                          </Tag>
+                        </Space>
+                      </List.Item>
+                    )}
+                  />
+                )}
               </Card>
             </Col>
           </Row>
