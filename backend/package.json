@@ -13,6 +13,8 @@
     "prisma:deploy": "prisma migrate deploy",
     "prisma:seed": "node prisma/seed.js",
     "ingest:public": "node src/scripts/ingest/public-data.ingest.js",
+    "ingest:realtime": "node src/scripts/ingest/realtime-generator.js",
+    "ingest:all": "npm run ingest:public && npm run ingest:realtime",
     "test": "jest --runInBand --detectOpenHandles --coverage",
     "test:watch": "jest --watch"
   },
