@@ -7,5 +7,7 @@ const ctrl = require("../controllers/publicData.controller");
 const { verifyToken } = require("../middleware/auth");
 
 router.get("/ringkasan", verifyToken, ctrl.getRingkasanPublik);
+router.get("/realtime-summary", verifyToken, ctrl.getRealtimeSummary);
+router.get("/realtime-stream", verifyToken, ctrl.realtimeStream);
 
 module.exports = router;
