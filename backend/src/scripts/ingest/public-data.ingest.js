@@ -58,14 +58,49 @@ async function fetchRemoteOrFallback(source) {
       const response = await fetch(finalUrl, { method: "GET" });
       if (!response.ok) throw new Error("HTTP " + response.status);
       const data = await response.json();
-      if (Array.isArray(data)) return data;
-      if (Array.isArray(data.data)) return data.data;
+      if (Array.isArray(data)) return { rows: data, isFallback: false };
+      if (Array.isArray(data.data)) return { rows: data.data, isFallback: false };
       throw new Error("Format data tidak valid");
     } catch (err) {
       console.warn("[ingest] fallback " + source.slug + " karena fetch gagal:", err.message);
     }
   }
-  return readFallback(source.fallbackFile);
+  return { rows: await readFallback(source.fallbackFile), isFallback: true };
+}
+
+async function scrapeBgnValidationBestEffort() {
+  const targetUrl = process.env.BGN_VALIDATION_URL || "https://validasidata.bgn.go.id";
+  try {
+    const response = await fetch(targetUrl, { method: "GET" });
+    if (!response.ok) throw new Error("HTTP " + response.status);
+    const html = await response.text();
+    const matches = html.match(/\d{3,}/g) || [];
+    const largest = matches
+      .map((x) => Number(x))
+      .filter((x) => Number.isFinite(x))
+      .sort((a, b) => b - a)[0];
+    if (!largest) throw new Error("angka tidak ditemukan di halaman");
+    const tahun = new Date().getFullYear();
+    return [
+      {
+        kodeWilayah: "IDN",
+        namaWilayah: "Indonesia",
+        levelWilayah: "NASIONAL",
+        tahun,
+        kategori: "PROGRAM_MBG",
+        indikator: "TOTAL_PENERIMA_VALIDASI_BGN",
+        nilai: largest,
+        satuan: "ORANG",
+        metadata: {
+          scrapedFrom: targetUrl,
+          mode: "best_effort",
+        },
+      },
+    ];
+  } catch (err) {
+    console.warn("[ingest] scraping bgn gagal:", err.message);
+    return [];
+  }
 }
 
 async function upsertSource(source) {
@@ -89,7 +124,9 @@ async function upsertSource(source) {
 
 async function ingestOne(source) {
   const sourceRecord = await upsertSource(source);
-  const records = await fetchRemoteOrFallback(source);
+  const now = new Date();
+  const fetchResult = await fetchRemoteOrFallback(source);
+  const records = fetchResult.rows;
   const normalized = records
     .filter((r) => r && r.kodeWilayah && r.indikator && Number.isFinite(Number(r.nilai)))
     .map((r) => ({
@@ -102,7 +139,15 @@ async function ingestOne(source) {
       indikator: String(r.indikator),
       nilai: Number(r.nilai),
       satuan: r.satuan ? String(r.satuan) : null,
-      metadata: r.metadata || null,
+      metadata: {
+        ...(r.metadata || {}),
+        source: source.slug,
+        fetchedAt: now.toISOString(),
+        generatedAt: now.toISOString(),
+        timezone: "Asia/Jakarta",
+        qualityFlag: "OK",
+        isFallback: fetchResult.isFallback,
+      },
     }));
 
   await prisma.indikatorPublik.deleteMany({
@@ -113,6 +158,18 @@ async function ingestOne(source) {
       data: normalized,
     });
   }
+  await prisma.ingestBatch.create({
+    data: {
+      source: source.slug,
+      fetchedAt: new Date(),
+      generatedAt: new Date(),
+      timezone: "Asia/Jakarta",
+      qualityFlag: normalized.length > 0 ? "OK" : "EMPTY",
+      isFallback: fetchResult.isFallback,
+      totalRecords: normalized.length,
+      notes: "Ingest publik per source",
+    },
+  });
   return { slug: source.slug, count: normalized.length };
 }
 
@@ -122,6 +179,31 @@ async function main() {
     const r = await ingestOne(source);
     results.push(r);
     console.log("[ingest]", source.slug, "=", r.count, "baris");
+  }
+  const bgnRows = await scrapeBgnValidationBestEffort();
+  if (bgnRows.length > 0) {
+    const source = await upsertSource({
+      slug: "bgn_validation_scrape",
+      nama: "BGN Validation Scrape",
+      lisensi: "Best Effort Public Web",
+      urlSumber: process.env.BGN_VALIDATION_URL || "https://validasidata.bgn.go.id",
+    });
+    await prisma.indikatorPublik.deleteMany({ where: { sumberId: source.id, indikator: "TOTAL_PENERIMA_VALIDASI_BGN" } });
+    await prisma.indikatorPublik.createMany({
+      data: bgnRows.map((r) => ({
+        sumberId: source.id,
+        kodeWilayah: r.kodeWilayah,
+        namaWilayah: r.namaWilayah,
+        levelWilayah: r.levelWilayah,
+        tahun: r.tahun,
+        kategori: r.kategori,
+        indikator: r.indikator,
+        nilai: Number(r.nilai),
+        satuan: r.satuan,
+        metadata: r.metadata,
+      })),
+    });
+    results.push({ slug: "bgn_validation_scrape", count: bgnRows.length });
   }
   const total = results.reduce((sum, r) => sum + r.count, 0);
   console.log("[ingest] total indikator publik:", total);

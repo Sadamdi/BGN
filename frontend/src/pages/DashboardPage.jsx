@@ -76,6 +76,8 @@ export default function DashboardPage() {
   const [kategori, setKategori] = useState({});
   const [alert, setAlert] = useState({ sppgBelumLapor: [], sppgRealisasiRendah: [], penerimaGiziBermasalah: [] });
   const [indikatorPublik, setIndikatorPublik] = useState([]);
+  const [realtimeSummary, setRealtimeSummary] = useState(null);
+  const [streamStatus, setStreamStatus] = useState("Menghubungkan...");
   const [terakhir, setTerakhir] = useState(null);
 
   const fetchAll = async () => {
@@ -90,12 +92,14 @@ export default function DashboardPage() {
         dashApi.getAlert(),
       ]);
       const publik = await publicDataApi.getRingkasanPublik(dayjs().year());
+      const realtime = await publicDataApi.getRealtimeSummary();
       setStat(s.data);
       setTren(t.data);
       setSebaran(sb.data);
       setKategori(k.data);
       setAlert(a.data);
       setIndikatorPublik((publik && publik.data) || []);
+      setRealtimeSummary((realtime && realtime.data) || null);
       setTerakhir(new Date());
     } catch (err) {
       setError((err.response && err.response.data && err.response.data.message) || "Gagal memuat dashboard");
@@ -110,6 +114,30 @@ export default function DashboardPage() {
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [range]);
+
+  useEffect(() => {
+    const es = publicDataApi.createRealtimeStream(
+      (type, payloadRaw) => {
+        if (type === "batch") {
+          try {
+            const payload = JSON.parse(payloadRaw);
+            const mapped = {};
+            (payload.values || []).forEach((v) => {
+              mapped[v.metricKey] = (mapped[v.metricKey] || 0) + Number(v.delta || 0);
+            });
+            setRealtimeSummary({
+              timezone: payload.timezone || "Asia/Jakarta",
+              updatedAt: payload.generatedAt || new Date().toISOString(),
+              values: mapped,
+            });
+          } catch (_) {}
+        }
+        setStreamStatus("Live");
+      },
+      () => setStreamStatus("Terputus")
+    );
+    return () => es && es.close();
+  }, []);
 
   const cakupanColor = useMemo(() => {
     const v = (stat && stat.persentaseCakupan) || 0;
@@ -304,6 +332,28 @@ export default function DashboardPage() {
           </Row>
 
           <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+            <Col span={24}>
+              <Card title="Update Hari Ini Realtime MBG" extra={<Tag color={streamStatus === "Live" ? "green" : "orange"}>{streamStatus}</Tag>}>
+                {realtimeSummary ? (
+                  <Row gutter={[12, 12]}>
+                    <Col xs={24} md={8} lg={4}><Statistic title="Penerima + " value={(realtimeSummary.values?.PENERIMA_MANFAAT || 0)} /></Col>
+                    <Col xs={24} md={8} lg={4}><Statistic title="Distribusi + " value={(realtimeSummary.values?.DISTRIBUSI_MBG || 0)} /></Col>
+                    <Col xs={24} md={8} lg={4}><Statistic title="Status Gizi + " value={(realtimeSummary.values?.STATUS_GIZI || 0)} /></Col>
+                    <Col xs={24} md={8} lg={4}><Statistic title="Laporan + " value={(realtimeSummary.values?.LAPORAN || 0)} /></Col>
+                    <Col xs={24} md={8} lg={4}><Statistic title="SPPG + " value={(realtimeSummary.values?.SPPG || 0)} /></Col>
+                    <Col xs={24} md={8} lg={4}>
+                      <div style={{ fontSize: 12, color: "#64748b" }}>
+                        Zona waktu: {realtimeSummary.timezone || "Asia/Jakarta"}
+                        <br />
+                        Update: {realtimeSummary.updatedAt ? dayjs(realtimeSummary.updatedAt).format("DD MMM YYYY HH:mm:ss") : "-"}
+                      </div>
+                    </Col>
+                  </Row>
+                ) : (
+                  <Empty description="Realtime summary belum tersedia" />
+                )}
+              </Card>
+            </Col>
             <Col xs={24} lg={14}>
               <Card title="Sebaran SPPG" bodyStyle={{ padding: 0 }}>
                 <div style={{ height: 420 }}>
