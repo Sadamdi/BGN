@@ -1,0 +1,25 @@
+node_modules/
+dist/
+build/
+coverage/
+.env
+.env.local
+.env.*.local
+*.log
+npm-debug.log*
+.DS_Store
+.vscode/
+.idea/
+uploads/
+backend/uploads/
+backend/prisma/migrations/dev.db*
+*.tsbuildinfo
+.eslintcache
+# Added by code-review-graph
+.code-review-graph/
+.cursor/
+.claude/
+.cursorrules
+AGENTS.md
+prompt_master.md
+.vercel

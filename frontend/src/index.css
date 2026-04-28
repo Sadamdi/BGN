@@ -1,0 +1,26 @@
+html, body, #root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  background: #F5F7FA;
+  color: #0f172a;
+}
+
+.bgn-page-title {
+  border-left: 4px solid #1B3A6B;
+  padding-left: 12px;
+  font-weight: 700;
+  font-size: 20px;
+  margin: 0;
+}
+
+.bgn-stat-card {
+  border-radius: 12px;
+}
+
+.leaflet-container {
+  border-radius: 8px;
+}

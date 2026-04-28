@@ -1,0 +1,79 @@
+"use strict";
+
+const PERAN = Object.freeze({
+  ADMIN: "ADMIN",
+  PENGAWAS_GIZI: "PENGAWAS_GIZI",
+  OPERATOR_SPPG: "OPERATOR_SPPG",
+  ASISTEN_LAPANGAN: "ASISTEN_LAPANGAN",
+  PEJABAT_BGN: "PEJABAT_BGN",
+});
+
+const PERAN_LABEL = Object.freeze({
+  ADMIN: "Administrator",
+  PENGAWAS_GIZI: "Pengawas Gizi",
+  OPERATOR_SPPG: "Operator SPPG",
+  ASISTEN_LAPANGAN: "Asisten Lapangan",
+  PEJABAT_BGN: "Pejabat BGN",
+});
+
+const KATEGORI = Object.freeze({
+  PESERTA_DIDIK: "PESERTA_DIDIK",
+  BALITA: "BALITA",
+  IBU_HAMIL: "IBU_HAMIL",
+  IBU_MENYUSUI: "IBU_MENYUSUI",
+});
+
+const KATEGORI_LABEL = Object.freeze({
+  PESERTA_DIDIK: "Peserta Didik",
+  BALITA: "Balita",
+  IBU_HAMIL: "Ibu Hamil",
+  IBU_MENYUSUI: "Ibu Menyusui",
+});
+
+const JENIS_KELAMIN = Object.freeze({
+  LAKI_LAKI: "LAKI_LAKI",
+  PEREMPUAN: "PEREMPUAN",
+});
+
+const STATUS_GIZI = Object.freeze({
+  GIZI_BURUK: "GIZI_BURUK",
+  GIZI_KURANG: "GIZI_KURANG",
+  GIZI_BAIK: "GIZI_BAIK",
+  GIZI_LEBIH: "GIZI_LEBIH",
+});
+
+const STATUS_DISTRIBUSI = Object.freeze({
+  DRAFT: "DRAFT",
+  TERKONFIRMASI: "TERKONFIRMASI",
+  TERVALIDASI: "TERVALIDASI",
+});
+
+const WARNA = Object.freeze({
+  PRIMARY_BLUE: "#1B3A6B",
+  PRIMARY_BLUE_LIGHT: "#2E5FA3",
+  SUCCESS: "#52c41a",
+  WARNING: "#faad14",
+  ERROR: "#ff4d4f",
+  GIZI_BAIK: "#52c41a",
+  GIZI_KURANG: "#faad14",
+  GIZI_BURUK: "#ff4d4f",
+  GIZI_LEBIH: "#fa8c16",
+  KATEGORI_PESERTA_DIDIK: "#1B3A6B",
+  KATEGORI_BALITA: "#52c41a",
+  KATEGORI_IBU_HAMIL: "#fa8c16",
+  KATEGORI_IBU_MENYUSUI: "#722ed1",
+});
+
+const BIAYA_PER_PORSI_DEFAULT = 10000;
+
+module.exports = {
+  PERAN,
+  PERAN_LABEL,
+  KATEGORI,
+  KATEGORI_LABEL,
+  JENIS_KELAMIN,
+  STATUS_GIZI,
+  STATUS_DISTRIBUSI,
+  WARNA,
+  BIAYA_PER_PORSI_DEFAULT,
+};

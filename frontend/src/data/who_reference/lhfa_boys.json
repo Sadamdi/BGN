@@ -1,0 +1,11 @@
+{
+  "rows": [
+    { "age": 0, "minus3": 44.2, "minus2": 46.1, "median": 49.9, "plus2": 53.7, "plus3": 55.6 },
+    { "age": 6, "minus3": 61.2, "minus2": 63.3, "median": 67.6, "plus2": 71.9, "plus3": 74.0 },
+    { "age": 12, "minus3": 68.6, "minus2": 71.0, "median": 75.7, "plus2": 80.5, "plus3": 82.9 },
+    { "age": 24, "minus3": 78.7, "minus2": 81.7, "median": 87.1, "plus2": 92.9, "plus3": 95.8 },
+    { "age": 36, "minus3": 86.4, "minus2": 89.6, "median": 96.1, "plus2": 102.7, "plus3": 105.8 },
+    { "age": 48, "minus3": 92.4, "minus2": 95.7, "median": 103.3, "plus2": 110.6, "plus3": 113.9 },
+    { "age": 60, "minus3": 98.7, "minus2": 102.3, "median": 110.0, "plus2": 117.7, "plus3": 121.4 }
+  ]
+}

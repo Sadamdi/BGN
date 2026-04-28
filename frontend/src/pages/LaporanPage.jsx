@@ -1,0 +1,341 @@
+import React, { useState, useEffect } from "react";
+import {
+  Card,
+  Row,
+  Col,
+  Menu,
+  Form,
+  DatePicker,
+  Select,
+  Button,
+  Table,
+  Space,
+  Statistic,
+  App,
+  Collapse,
+  Input,
+  List,
+  Tag,
+} from "antd";
+import { DownloadOutlined, FilePdfOutlined, FileExcelOutlined, ReloadOutlined } from "@ant-design/icons";
+import dayjs from "dayjs";
+
+import PageHeader from "../components/layout/PageHeader";
+import * as laporanApi from "../api/laporan.api";
+import * as sppgApi from "../api/sppg.api";
+import { useAuthStore } from "../store/authStore";
+
+const JENIS = [
+  { key: "distribusi", label: "Distribusi MBG" },
+  { key: "status-gizi", label: "Status Gizi" },
+  { key: "kinerja-sppg", label: "Kinerja SPPG" },
+  { key: "penerima", label: "Penerima Manfaat" },
+];
+
+export default function LaporanPage() {
+  const [jenis, setJenis] = useState("distribusi");
+  const [filter, setFilter] = useState({ periode: [dayjs().subtract(30, "day"), dayjs()], sppgId: null, provinsi: null, kategori: null });
+  const [preview, setPreview] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [sppgOptions, setSppgOptions] = useState([]);
+  const [provList, setProvList] = useState([]);
+  const [jadwal, setJadwal] = useState([]);
+  const { message } = App.useApp();
+  const { hasRole } = useAuthStore();
+
+  useEffect(() => {
+    sppgApi.list({ limit: 200 }).then((r) => setSppgOptions(r.data || [])).catch(() => {});
+    sppgApi.provinsiList().then((r) => setProvList(r.data || [])).catch(() => {});
+    if (hasRole("ADMIN", "PEJABAT_BGN")) {
+      laporanApi.listJadwal().then((r) => setJadwal(r.data || [])).catch(() => {});
+    }
+  }, [hasRole]);
+
+  const buildBody = () => ({
+    periodeAwal: filter.periode && filter.periode[0] ? filter.periode[0].format("YYYY-MM-DD") : null,
+    periodeAkhir: filter.periode && filter.periode[1] ? filter.periode[1].format("YYYY-MM-DD") : null,
+    sppgId: filter.sppgId || null,
+    provinsi: filter.provinsi || null,
+    kategori: filter.kategori || null,
+  });
+
+  const onPreview = async () => {
+    setLoading(true);
+    setPreview(null);
+    try {
+      let r;
+      if (jenis === "distribusi") r = await laporanApi.previewDistribusi(buildBody());
+      else if (jenis === "status-gizi") r = await laporanApi.previewStatusGizi(buildBody());
+      else {
+        message.info("Pratinjau hanya tersedia untuk Distribusi & Status Gizi.");
+        setLoading(false);
+        return;
+      }
+      setPreview(r.data);
+    } catch (err) {
+      message.error((err.response && err.response.data && err.response.data.message) || "Gagal pratinjau");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onExportExcel = async () => {
+    setLoading(true);
+    try {
+      const blob = await laporanApi.exportExcel(jenis, buildBody());
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Laporan_${jenis}_${dayjs().format("YYYYMMDD")}.xlsx`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      message.success("Laporan diunduh");
+    } catch (err) {
+      message.error("Gagal mengunduh laporan");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onExportPdf = async () => {
+    setLoading(true);
+    try {
+      const blob = await laporanApi.exportPdf(buildBody());
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Laporan_distribusi_${dayjs().format("YYYYMMDD")}.pdf`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      message.error("Gagal mengunduh PDF");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const columnsDist = [
+    { title: "Tanggal", dataIndex: "tanggalDistribusi", render: (v) => dayjs(v).format("DD/MM/YYYY") },
+    { title: "SPPG", render: (r) => r.sppg && r.sppg.namaSppg },
+    { title: "Provinsi", render: (r) => r.sppg && r.sppg.provinsi },
+    { title: "Total Porsi", dataIndex: "totalPorsi", align: "right" },
+    { title: "Status", dataIndex: "status" },
+  ];
+
+  const columnsGizi = [
+    { title: "Nama", dataIndex: "namaLengkap" },
+    { title: "Kategori", dataIndex: "kategori" },
+    { title: "SPPG", dataIndex: "sppgNama" },
+    { title: "Tgl Ukur", dataIndex: "tanggalPengukuran", render: (v) => v ? dayjs(v).format("DD/MM/YYYY") : "-" },
+    { title: "Z BB/U", dataIndex: "zscoreBbU" },
+    { title: "Status", dataIndex: "statusGizi" },
+  ];
+
+  return (
+    <div>
+      <PageHeader title="Laporan" />
+      <Row gutter={[16, 16]}>
+        <Col xs={24} lg={6}>
+          <Card>
+            <Menu
+              mode="inline"
+              selectedKeys={[jenis]}
+              onClick={(e) => {
+                setJenis(e.key);
+                setPreview(null);
+              }}
+              items={JENIS.map((j) => ({ key: j.key, label: j.label }))}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} lg={18}>
+          <Card title="Filter">
+            <Space wrap>
+              <DatePicker.RangePicker
+                value={filter.periode}
+                onChange={(v) => setFilter((f) => ({ ...f, periode: v }))}
+              />
+              <Select
+                placeholder="Provinsi"
+                allowClear
+                style={{ minWidth: 220 }}
+                value={filter.provinsi || undefined}
+                onChange={(v) => setFilter((f) => ({ ...f, provinsi: v || null }))}
+                options={provList.map((p) => ({ value: p.provinsi, label: p.provinsi }))}
+              />
+              <Select
+                placeholder="SPPG"
+                allowClear
+                showSearch
+                style={{ minWidth: 240 }}
+                value={filter.sppgId || undefined}
+                onChange={(v) => setFilter((f) => ({ ...f, sppgId: v || null }))}
+                options={sppgOptions.map((s) => ({ value: s.id, label: s.namaSppg }))}
+                filterOption={(input, option) => (option.label || "").toLowerCase().includes(input.toLowerCase())}
+              />
+              <Select
+                placeholder="Kategori"
+                allowClear
+                style={{ minWidth: 180 }}
+                value={filter.kategori || undefined}
+                onChange={(v) => setFilter((f) => ({ ...f, kategori: v || null }))}
+                options={[
+                  { value: "PESERTA_DIDIK", label: "Peserta Didik" },
+                  { value: "BALITA", label: "Balita" },
+                  { value: "IBU_HAMIL", label: "Ibu Hamil" },
+                  { value: "IBU_MENYUSUI", label: "Ibu Menyusui" },
+                ]}
+              />
+              <Button icon={<ReloadOutlined />} onClick={onPreview} loading={loading}>
+                Pratinjau
+              </Button>
+              <Button type="primary" icon={<FileExcelOutlined />} onClick={onExportExcel} loading={loading}>
+                Export Excel
+              </Button>
+              {jenis === "distribusi" ? (
+                <Button icon={<FilePdfOutlined />} onClick={onExportPdf} loading={loading}>
+                  Export PDF
+                </Button>
+              ) : null}
+            </Space>
+          </Card>
+
+          <Card style={{ marginTop: 16 }} title="Pratinjau">
+            {preview && preview.summary ? (
+              <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
+                {Object.entries(preview.summary).map(([k, v]) => (
+                  <Col key={k} xs={12} md={6}>
+                    <Card size="small">
+                      <Statistic title={k} value={v} />
+                    </Card>
+                  </Col>
+                ))}
+              </Row>
+            ) : null}
+            {preview && jenis === "distribusi" ? (
+              <Table rowKey="id" columns={columnsDist} dataSource={preview.rows} pagination={false} size="small" scroll={{ x: 800 }} />
+            ) : null}
+            {preview && jenis === "status-gizi" ? (
+              <Table rowKey={(r) => r.namaLengkap + r.tanggalPengukuran} columns={columnsGizi} dataSource={preview.rows} pagination={false} size="small" scroll={{ x: 800 }} />
+            ) : null}
+          </Card>
+
+          {hasRole("ADMIN", "PEJABAT_BGN") ? (
+            <Card style={{ marginTop: 16 }}>
+              <Collapse
+                items={[
+                  {
+                    key: "1",
+                    label: "Laporan Otomatis Terjadwal",
+                    children: (
+                      <>
+                        <Form
+                          layout="vertical"
+                          onFinish={async (values) => {
+                            try {
+                              await laporanApi.buatJadwal({
+                                jenisLaporan: values.jenisLaporan,
+                                frekuensi: values.frekuensi,
+                                hari: values.hari || null,
+                                tanggal: values.tanggal || null,
+                                jam: values.jam || "06:00",
+                                emailTujuan: (values.emailTujuan || "").split(",").map((s) => s.trim()).filter(Boolean),
+                                filterJson: {},
+                              });
+                              message.success("Jadwal disimpan");
+                              const r = await laporanApi.listJadwal();
+                              setJadwal(r.data || []);
+                            } catch (_) {
+                              message.error("Gagal membuat jadwal");
+                            }
+                          }}
+                        >
+                          <Row gutter={12}>
+                            <Col xs={24} md={6}>
+                              <Form.Item label="Jenis Laporan" name="jenisLaporan" rules={[{ required: true }]}>
+                                <Select options={JENIS.map((j) => ({ value: j.key, label: j.label }))} />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={24} md={5}>
+                              <Form.Item label="Frekuensi" name="frekuensi" rules={[{ required: true }]}>
+                                <Select options={[{ value: "MINGGUAN", label: "Mingguan" }, { value: "BULANAN", label: "Bulanan" }]} />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={12} md={3}>
+                              <Form.Item label="Hari (0-6, Senin=1)" name="hari">
+                                <Input type="number" min={0} max={6} />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={12} md={3}>
+                              <Form.Item label="Tanggal (1-31)" name="tanggal">
+                                <Input type="number" min={1} max={31} />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={12} md={3}>
+                              <Form.Item label="Jam (HH:MM)" name="jam" initialValue="06:00">
+                                <Input />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={24} md={4}>
+                              <Form.Item label="Email Tujuan (koma)" name="emailTujuan" rules={[{ required: true }]}>
+                                <Input placeholder="a@bgn.go.id, b@bgn.go.id" />
+                              </Form.Item>
+                            </Col>
+                          </Row>
+                          <Button type="primary" htmlType="submit" icon={<DownloadOutlined />}>
+                            Tambah Jadwal
+                          </Button>
+                        </Form>
+                        <List
+                          style={{ marginTop: 16 }}
+                          bordered
+                          dataSource={jadwal}
+                          renderItem={(j) => (
+                            <List.Item
+                              actions={[
+                                <a
+                                  key="t"
+                                  onClick={async () => {
+                                    await laporanApi.toggleJadwal(j.id);
+                                    const r = await laporanApi.listJadwal();
+                                    setJadwal(r.data || []);
+                                  }}
+                                >
+                                  {j.aktif ? "Nonaktifkan" : "Aktifkan"}
+                                </a>,
+                                <a
+                                  key="h"
+                                  onClick={async () => {
+                                    await laporanApi.hapusJadwal(j.id);
+                                    const r = await laporanApi.listJadwal();
+                                    setJadwal(r.data || []);
+                                  }}
+                                >
+                                  Hapus
+                                </a>,
+                              ]}
+                            >
+                              <List.Item.Meta
+                                title={
+                                  <Space>
+                                    <b>{j.jenisLaporan}</b>
+                                    <Tag color={j.aktif ? "green" : "default"}>{j.aktif ? "Aktif" : "Nonaktif"}</Tag>
+                                  </Space>
+                                }
+                                description={`${j.frekuensi} • ${j.jam} • ${(j.emailTujuan || []).join(", ")}`}
+                              />
+                            </List.Item>
+                          )}
+                        />
+                      </>
+                    ),
+                  },
+                ]}
+              />
+            </Card>
+          ) : null}
+        </Col>
+      </Row>
+    </div>
+  );
+}
