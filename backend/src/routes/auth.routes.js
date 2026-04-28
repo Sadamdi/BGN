@@ -7,6 +7,7 @@ const ctrl = require("../controllers/auth.controller");
 const { verifyToken } = require("../middleware/auth");
 const { loginLimiter } = require("../middleware/rateLimiter");
 
+router.get("/login", ctrl.getLoginInfo);
 router.post("/login", loginLimiter, ctrl.postLogin);
 router.post("/refresh", ctrl.postRefresh);
 router.post("/logout", verifyToken, ctrl.postLogout);
