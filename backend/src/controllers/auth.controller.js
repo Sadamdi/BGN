@@ -14,6 +14,21 @@ async function postLogin(req, res, next) {
   }
 }
 
+function getLoginInfo(_req, res) {
+  return res.status(200).json({
+    success: true,
+    message: "Endpoint login aktif. Gunakan method POST ke /api/auth/login dengan body username/email dan password.",
+    data: {
+      method: "POST",
+      path: "/api/auth/login",
+      body: {
+        username: "admin",
+        password: "Admin@123!",
+      },
+    },
+  });
+}
+
 async function postRefresh(req, res, next) {
   try {
     const { refreshToken } = req.body || {};
@@ -109,6 +124,7 @@ async function getMe(req, res, next) {
 }
 
 module.exports = {
+  getLoginInfo,
   postLogin,
   postRefresh,
   postLogout,
