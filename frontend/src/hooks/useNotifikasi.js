@@ -5,7 +5,7 @@ import { useAuthStore } from "../store/authStore";
 import { useNotifikasiStore } from "../store/notifikasiStore";
 import * as notifApi from "../api/notifikasi.api";
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:3000";
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || (import.meta.env.DEV ? "http://localhost:3000" : window.location.origin);
 
 export default function useNotifikasi() {
   const { isAuthenticated, accessToken } = useAuthStore();

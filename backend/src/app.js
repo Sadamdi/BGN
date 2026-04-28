@@ -35,10 +35,19 @@ function buildApp() {
     })
   );
 
-  const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
+  const configuredOrigins = (process.env.FRONTEND_URL || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
   app.use(
     cors({
-      origin: FRONTEND_URL.split(",").map((s) => s.trim()),
+      origin(origin, callback) {
+        // Izinkan request server-to-server/non-browser.
+        if (!origin) return callback(null, true);
+        if (configuredOrigins.includes(origin)) return callback(null, true);
+        if (origin.endsWith(".vercel.app")) return callback(null, true);
+        return callback(new Error("Origin tidak diizinkan oleh kebijakan CORS"), false);
+      },
       credentials: true,
     })
   );

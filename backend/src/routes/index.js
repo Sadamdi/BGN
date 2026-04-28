@@ -12,5 +12,6 @@ router.use("/gizi", require("./gizi.routes"));
 router.use("/laporan", require("./laporan.routes"));
 router.use("/pengguna", require("./pengguna.routes"));
 router.use("/notifikasi", require("./notifikasi.routes"));
+router.use("/public-data", require("./publicData.routes"));
 
 module.exports = router;

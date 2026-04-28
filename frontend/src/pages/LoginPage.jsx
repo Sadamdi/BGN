@@ -66,13 +66,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        background: "linear-gradient(135deg, #1B3A6B 0%, #2E5FA3 100%)",
-      }}
-    >
+    <div className="auth-screen">
       <div
         style={{
           flex: 1,
@@ -80,20 +74,21 @@ export default function LoginPage() {
           alignItems: "center",
           justifyContent: "center",
           padding: 24,
+          maxWidth: 620,
         }}
         className="bgn-login-side"
       >
-        <div style={{ color: "#fff", maxWidth: 460 }}>
-          <Title level={2} style={{ color: "#fff", marginBottom: 4 }}>
+        <div style={{ color: "#0f172a", maxWidth: 460 }}>
+          <Title level={2} style={{ color: "#0f172a", marginBottom: 4 }}>
             SIPGN-BGN
           </Title>
-          <Title level={4} style={{ color: "#fff", marginTop: 0 }}>
+          <Title level={4} style={{ color: "#1e293b", marginTop: 0 }}>
             Sistem Informasi Pemenuhan Gizi Nasional
           </Title>
-          <Text style={{ color: "#dbeafe" }}>
+          <Text style={{ color: "#334155" }}>
             Badan Gizi Nasional — Program Makan Bergizi Gratis
           </Text>
-          <p style={{ color: "#cbd5e1", marginTop: 24, fontSize: 14, lineHeight: 1.7 }}>
+          <p style={{ color: "#475569", marginTop: 24, fontSize: 14, lineHeight: 1.7 }}>
             Pantau distribusi MBG, kelola data penerima manfaat, dan analisis status gizi
             di seluruh SPPG Indonesia secara terpadu.
           </p>
@@ -103,14 +98,14 @@ export default function LoginPage() {
       <div
         style={{
           width: 480,
-          background: "#fff",
+          background: "transparent",
           padding: 32,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
         }}
       >
-        <Card style={{ width: "100%", maxWidth: 400, border: "none", boxShadow: "none" }}>
+        <Card className="auth-card" style={{ width: "100%", maxWidth: 410 }}>
           <Title level={3} style={{ marginBottom: 4 }}>
             Selamat datang
           </Title>

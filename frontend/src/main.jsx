@@ -11,22 +11,35 @@ import App from "./App.jsx";
 
 const theme = {
   token: {
-    colorPrimary: "#1B3A6B",
+    colorPrimary: "#1D4ED8",
+    colorInfo: "#1D4ED8",
     colorSuccess: "#52c41a",
     colorWarning: "#faad14",
     colorError: "#ff4d4f",
-    borderRadius: 8,
+    colorBgLayout: "#F3F6FB",
+    colorBgContainer: "#FFFFFF",
+    colorText: "#0F172A",
+    borderRadius: 12,
+    borderRadiusLG: 16,
     fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif",
+    boxShadowSecondary: "0 10px 30px rgba(15, 23, 42, 0.08)",
   },
   components: {
     Layout: {
-      siderBg: "#1B3A6B",
+      siderBg: "#0F172A",
       headerBg: "#ffffff",
-      bodyBg: "#F5F7FA",
+      bodyBg: "#F3F6FB",
     },
     Menu: {
-      darkItemBg: "#1B3A6B",
-      darkSubMenuItemBg: "#142b51",
+      darkItemBg: "#0F172A",
+      darkSubMenuItemBg: "#111827",
+      darkItemSelectedBg: "#1D4ED8",
+    },
+    Card: {
+      borderRadiusLG: 16,
+    },
+    Button: {
+      borderRadius: 10,
     },
   },
 };

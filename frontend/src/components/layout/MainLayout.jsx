@@ -118,7 +118,7 @@ export default function MainLayout() {
             padding: collapsed ? "20px 8px" : "20px 16px",
             fontSize: collapsed ? 12 : 18,
             textAlign: collapsed ? "center" : "left",
-            borderBottom: "1px solid #142b51",
+            borderBottom: "1px solid #1f2937",
           }}
         >
           {collapsed ? "BGN" : "SIPGN-BGN"}
@@ -139,6 +139,7 @@ export default function MainLayout() {
             alignItems: "center",
             justifyContent: "space-between",
             borderBottom: "1px solid #e2e8f0",
+            boxShadow: "0 4px 14px rgba(15, 23, 42, 0.04)",
           }}
         >
           <Button
@@ -165,7 +166,7 @@ export default function MainLayout() {
             </Dropdown>
           </div>
         </Header>
-        <Content style={{ padding: 24, background: "#F5F7FA" }}>
+        <Content style={{ padding: 24, background: "#F3F6FB" }}>
           <Outlet />
         </Content>
         <Footer style={{ textAlign: "center", color: "#475569" }}>
