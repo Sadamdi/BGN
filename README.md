@@ -17,7 +17,7 @@ Sistem terpadu Badan Gizi Nasional untuk mengelola dan memantau program **Makan 
 - **PDP Compliance** — NIK terenkripsi AES-256-GCM, hash HMAC-SHA256 untuk lookup, masking `1234********9012`, audit trail otomatis untuk semua operasi data pribadi.
 - **DevOps** — Vercel-first deployment (frontend), backend stateful terpisah, CI GitHub Actions, backup script `pg_dump` dengan retensi.
 
-## Tech stack (sesuai `prompt_master.md`)
+## Tech stack sesuai `prompt_master.md`
 
 **Frontend**: React 18 (Vite 5), Ant Design 5, Recharts 2, React-Leaflet 4, Zustand 5, Axios, dayjs, html2canvas, socket.io-client.
 
@@ -42,7 +42,7 @@ Sistem terpadu Badan Gizi Nasional untuk mengelola dan memantau program **Makan 
 - PostgreSQL 15+ dan Redis 7+ (local atau managed service)
 - Untuk export PDF: koneksi internet pertama kali (Puppeteer mengunduh Chromium)
 
-## Cara menjalankan (mode lokal)
+## Cara menjalankan mode lokal
 
 1. **Salin env**
 
@@ -83,7 +83,7 @@ Sistem terpadu Badan Gizi Nasional untuk mengelola dan memantau program **Makan 
    - Backend API: http://localhost:3000/api
    - Health check: http://localhost:3000/api/health
 
-## Akun default (hasil seed)
+## Akun default hasil seed
 
 | Peran            | Username        | Password         |
 | ---------------- | --------------- | ---------------- |
@@ -132,7 +132,7 @@ Tambahkan ke crontab: `0 2 * * * /app/backend/src/scripts/backup.sh`.
 - **`P2002` duplicate key** — kombinasi `(sppgId, tanggalDistribusi)` unik per hari; gunakan endpoint update jika sudah ada.
 - **Notifikasi tidak masuk** — periksa token Socket.IO valid (lihat tab Network browser → ws → handshake), serta server log `[sipgn-bgn] backend listening`.
 
-## Deploy ke Vercel (via MCP) — Rekomendasi Arsitektur
+## Deploy ke Vercel via MCP — Rekomendasi Arsitektur
 
 Untuk kondisi sekarang (backend Express stateful + Socket.IO + cron), pola yang aman:
 
