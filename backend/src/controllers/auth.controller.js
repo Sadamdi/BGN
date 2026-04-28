@@ -51,9 +51,20 @@ async function postForgotPassword(req, res, next) {
 async function postResetPassword(req, res, next) {
   try {
     const token = req.params.token;
-    const { password } = req.body || {};
-    await auth.resetPassword({ token, newPassword: password });
+    const { password, otp } = req.body || {};
+    await auth.resetPassword({ token, otp, newPassword: password });
     return sukses(res, null, "Password berhasil direset. Silakan login kembali.");
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function postVerifyResetOtp(req, res, next) {
+  try {
+    const token = req.params.token;
+    const { otp } = req.body || {};
+    await auth.verifyResetOtp({ token, otp });
+    return sukses(res, null, "OTP valid");
   } catch (err) {
     next(err);
   }
@@ -102,6 +113,7 @@ module.exports = {
   postRefresh,
   postLogout,
   postForgotPassword,
+  postVerifyResetOtp,
   postResetPassword,
   postUbahPassword,
   getMe,

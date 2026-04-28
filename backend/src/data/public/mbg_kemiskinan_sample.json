@@ -1,0 +1,29 @@
+[
+  {
+    "kodeWilayah": "31",
+    "namaWilayah": "DKI Jakarta",
+    "levelWilayah": "PROVINSI",
+    "tahun": 2024,
+    "kategori": "SOSIAL_EKONOMI",
+    "indikator": "PERSENTASE_PENDUDUK_MISKIN",
+    "nilai": 4.44,
+    "satuan": "PERSEN",
+    "metadata": {
+      "sumberPublikasi": "BPS",
+      "catatan": "Contoh agregat publik untuk integrasi awal."
+    }
+  },
+  {
+    "kodeWilayah": "32",
+    "namaWilayah": "Jawa Barat",
+    "levelWilayah": "PROVINSI",
+    "tahun": 2024,
+    "kategori": "SOSIAL_EKONOMI",
+    "indikator": "PERSENTASE_PENDUDUK_MISKIN",
+    "nilai": 7.46,
+    "satuan": "PERSEN",
+    "metadata": {
+      "sumberPublikasi": "BPS"
+    }
+  }
+]

@@ -50,12 +50,14 @@ async function emailWelcome({ to, namaLengkap, username, password }) {
   return kirimEmail({ to, subject, html, text: html.replace(/<[^>]+>/g, "") });
 }
 
-async function emailResetPassword({ to, namaLengkap, link }) {
+async function emailResetPassword({ to, namaLengkap, link, otpCode, ttlMinutes = 30 }) {
   const subject = "Reset Password SIPGN-BGN";
   const html = `
     <p>Halo <b>${namaLengkap}</b>,</p>
     <p>Kami menerima permintaan reset password untuk akun SIPGN-BGN Anda.</p>
-    <p>Silakan klik tautan berikut dalam 30 menit:</p>
+    <p>Masukkan OTP berikut pada halaman reset:</p>
+    <p style="font-size:20px;letter-spacing:4px;"><b>${otpCode || "-"}</b></p>
+    <p>Silakan klik tautan berikut dalam ${ttlMinutes} menit:</p>
     <p><a href="${link}">${link}</a></p>
     <p>Jika Anda tidak meminta reset password, abaikan email ini.</p>
   `;

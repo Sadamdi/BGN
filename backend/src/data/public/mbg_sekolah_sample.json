@@ -1,0 +1,28 @@
+[
+  {
+    "kodeWilayah": "3171",
+    "namaWilayah": "Kota Jakarta Selatan",
+    "levelWilayah": "KABKOTA",
+    "tahun": 2024,
+    "kategori": "PENDIDIKAN",
+    "indikator": "JUMLAH_SATUAN_PENDIDIKAN",
+    "nilai": 1821,
+    "satuan": "UNIT",
+    "metadata": {
+      "sumberPublikasi": "Pusdatin Kemendikbudristek"
+    }
+  },
+  {
+    "kodeWilayah": "3273",
+    "namaWilayah": "Kota Bandung",
+    "levelWilayah": "KABKOTA",
+    "tahun": 2024,
+    "kategori": "PENDIDIKAN",
+    "indikator": "JUMLAH_SATUAN_PENDIDIKAN",
+    "nilai": 1654,
+    "satuan": "UNIT",
+    "metadata": {
+      "sumberPublikasi": "Pusdatin Kemendikbudristek"
+    }
+  }
+]

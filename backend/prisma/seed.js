@@ -145,10 +145,16 @@ async function main() {
   // Admin
   const admin = await prisma.pengguna.upsert({
     where: { username: "admin" },
-    update: {},
+    update: {
+      email: "bgnengineer@gmail.com",
+      passwordHash,
+      namaLengkap: "Administrator BGN",
+      peran: "ADMIN",
+      statusAktif: true,
+    },
     create: {
       username: "admin",
-      email: "admin@bgn.go.id",
+      email: "bgnengineer@gmail.com",
       passwordHash,
       namaLengkap: "Administrator BGN",
       peran: "ADMIN",
