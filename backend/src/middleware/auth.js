@@ -7,8 +7,19 @@ const { getRedis } = require("../config/redis");
 async function verifyToken(req, res, next) {
   try {
     const header = req.headers.authorization || "";
-    const [scheme, token] = header.split(" ");
+    const [scheme, headerToken] = header.split(" ");
+    const queryToken = req.query && req.query.token ? String(req.query.token) : null;
+    const token = scheme === "Bearer" ? headerToken : queryToken;
     if (scheme !== "Bearer" || !token) {
+      if (!queryToken) {
+        return res.status(401).json({
+          success: false,
+          message: "Token autentikasi tidak ditemukan",
+          code: "NO_TOKEN",
+        });
+      }
+    }
+    if (!token) {
       return res.status(401).json({
         success: false,
         message: "Token autentikasi tidak ditemukan",

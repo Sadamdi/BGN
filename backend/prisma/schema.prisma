@@ -272,3 +272,47 @@ model IndikatorPublik {
   @@index([indikator])
   @@map("indikator_publik")
 }
+
+model IngestBatch {
+  id           String   @id @default(uuid())
+  source       String   @db.VarChar(60)
+  fetchedAt    DateTime @map("fetched_at")
+  generatedAt  DateTime @map("generated_at")
+  timezone     String   @default("Asia/Jakarta") @db.VarChar(40)
+  qualityFlag  String   @default("OK") @map("quality_flag") @db.VarChar(20)
+  isFallback   Boolean  @default(false) @map("is_fallback")
+  totalRecords Int      @default(0) @map("total_records")
+  notes        String?  @db.Text
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([source, createdAt])
+  @@index([generatedAt])
+  @@map("ingest_batch")
+}
+
+model RealtimeMetric {
+  id          String   @id @default(uuid())
+  dateJakarta DateTime @map("date_jakarta") @db.Date
+  generatedAt DateTime @map("generated_at")
+  timezone    String   @default("Asia/Jakarta") @db.VarChar(40)
+  metricKey   String   @map("metric_key") @db.VarChar(80)
+  delta       Int
+  source      String   @db.VarChar(40)
+  isFallback  Boolean  @default(false) @map("is_fallback")
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([dateJakarta, metricKey])
+  @@index([generatedAt])
+  @@map("realtime_metric")
+}
+
+model RealtimeEventStream {
+  id        String   @id @default(uuid())
+  eventType String   @map("event_type") @db.VarChar(80)
+  payload   Json
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@map("realtime_event_stream")
+}
