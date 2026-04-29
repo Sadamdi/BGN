@@ -6,7 +6,7 @@ const { prisma } = require("../../config/database");
 const { runBgnScrapeSync } = require("../../services/bgnScrapeSync.service");
 
 async function main() {
-  const result = await runBgnScrapeSync({ trigger: "cron" });
+  const result = await runBgnScrapeSync({ trigger: "cron", fullCrawl: true });
   if (result && result.skipped) {
     console.log("[ingest:bgn-scrape] skipped:", result.reason);
     return;

@@ -43,7 +43,8 @@ function makeHash(input, size = 8) {
 
 async function fetchText(url) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 25000);
+  const timeoutMs = Math.max(2000, Number(process.env.BGN_HTTP_TIMEOUT_MS || 8000));
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(url, {
       method: "GET",
@@ -61,6 +62,16 @@ async function fetchText(url) {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function buildSppgPageUrl(baseUrl, page) {
+  const url = new URL(baseUrl);
+  url.searchParams.set("page", String(page));
+  // Halaman BGN memakai query `search`, walaupun bisa kosong.
+  if (!url.searchParams.has("search")) {
+    url.searchParams.set("search", "");
+  }
+  return url.toString();
 }
 
 function parseSppgOperasional(html) {
@@ -100,6 +111,65 @@ function parseSppgOperasional(html) {
     totalSppg,
     updatedLabel,
     rows,
+  };
+}
+
+async function scrapeAllSppgPages(baseUrl, firstPageParsed, options = {}) {
+  const rowsPerPage = Math.max(1, firstPageParsed.rows.length || 10);
+  const totalPages = Math.max(1, Math.ceil((firstPageParsed.totalSppg || rowsPerPage) / rowsPerPage));
+  const concurrency = Math.max(1, Number(process.env.BGN_SPPG_PAGE_CONCURRENCY || 40));
+  const fullCrawl = options.fullCrawl === true;
+  const configuredMaxPages = fullCrawl ? Number(process.env.BGN_SPPG_MAX_PAGES_FULL || 0) : Number(process.env.BGN_SPPG_MAX_PAGES || 300);
+  const cappedTotalPages =
+    configuredMaxPages > 0 ? Math.min(totalPages, configuredMaxPages) : totalPages;
+
+  const allRows = [...firstPageParsed.rows];
+  const failedPages = [];
+
+  for (let start = 2; start <= cappedTotalPages; start += concurrency) {
+    const batch = [];
+    const end = Math.min(cappedTotalPages, start + concurrency - 1);
+    for (let page = start; page <= end; page += 1) {
+      batch.push(
+        fetchText(buildSppgPageUrl(baseUrl, page))
+          .then((html) => ({ page, html }))
+          .catch((err) => ({ page, err }))
+      );
+    }
+
+    const settled = await Promise.all(batch);
+    for (const item of settled) {
+      if (item.err) {
+        failedPages.push(item.page);
+        continue;
+      }
+      const parsed = parseSppgOperasional(item.html);
+      if (parsed.rows.length > 0) {
+        allRows.push(...parsed.rows);
+      }
+    }
+  }
+
+  const unique = [];
+  const seen = new Set();
+  for (const row of allRows) {
+    const key = [
+      normalizeKey(row.namaSppg),
+      normalizeKey(row.provinsi),
+      normalizeKey(row.kabupatenKota),
+      normalizeKey(row.kecamatan || ""),
+      normalizeKey(row.alamat || ""),
+    ].join("|");
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    unique.push(row);
+  }
+
+  return {
+    rows: unique,
+    totalPages: cappedTotalPages,
+    failedPages,
+    rowsPerPage,
   };
 }
 
@@ -207,18 +277,6 @@ async function saveDomainLinksToPublicData({ rows, sourceUrl, generatedAt }) {
   return { totalRecords: payload.length };
 }
 
-async function makeUniqueKodeSppg(prefix, key) {
-  const base = `${prefix}-${makeHash(key, 6)}`.slice(0, 20);
-  let candidate = base;
-  for (let i = 0; i < 20; i += 1) {
-    const exists = await prisma.sppg.findUnique({ where: { kodeSppg: candidate }, select: { id: true } });
-    if (!exists) return candidate;
-    const suffix = String(i + 1);
-    candidate = `${base.slice(0, 20 - suffix.length)}${suffix}`;
-  }
-  return `SPPG-${makeHash(`${key}-${Date.now()}`, 8)}`.slice(0, 20);
-}
-
 async function syncSppgRows(rows, generatedAt, sourceUrl, updatedLabel) {
   const existing = await prisma.sppg.findMany({
     select: {
@@ -248,6 +306,22 @@ async function syncSppgRows(rows, generatedAt, sourceUrl, updatedLabel) {
   let created = 0;
   let updated = 0;
   let skipped = 0;
+  const toCreate = [];
+  const toUpdate = [];
+  const usedKode = new Set(existing.map((x) => x.kodeSppg));
+
+  const makeNewKodeSppg = (prefix, identityKey) => {
+    const base = `${prefix}-${makeHash(identityKey, 8)}`.slice(0, 20);
+    let candidate = base;
+    let i = 1;
+    while (usedKode.has(candidate)) {
+      const suffix = String(i);
+      candidate = `${base.slice(0, Math.max(0, 20 - suffix.length))}${suffix}`;
+      i += 1;
+    }
+    usedKode.add(candidate);
+    return candidate;
+  };
 
   for (const row of rows) {
     const identityKey = [
@@ -271,11 +345,7 @@ async function syncSppgRows(rows, generatedAt, sourceUrl, updatedLabel) {
         normalizeKey(existingRow.namaSppg) !== normalizeKey(patch.namaSppg) ||
         normalizeKey(existingRow.alamat) !== normalizeKey(patch.alamat);
       if (isChanged) {
-        await prisma.sppg.update({
-          where: { id: existingRow.id },
-          data: patch,
-        });
-        updated += 1;
+        toUpdate.push({ id: existingRow.id, patch });
       } else {
         skipped += 1;
       }
@@ -283,21 +353,40 @@ async function syncSppgRows(rows, generatedAt, sourceUrl, updatedLabel) {
     }
 
     const codePrefix = normalizeKey(row.provinsi).replace(/[^a-z0-9]/g, "").slice(0, 4).toUpperCase() || "SPPG";
-    const kodeSppg = await makeUniqueKodeSppg(codePrefix, identityKey);
-    await prisma.sppg.create({
-      data: {
-        kodeSppg,
-        namaSppg: row.namaSppg.slice(0, 200),
-        alamat: (row.alamat || `${row.kelurahanDesa || "-"}, ${row.kecamatan || "-"}, ${row.kabupatenKota}, ${row.provinsi}`).slice(0, 4000),
-        provinsi: row.provinsi.slice(0, 100),
-        kabupatenKota: row.kabupatenKota.slice(0, 100),
-        kecamatan: row.kecamatan ? row.kecamatan.slice(0, 100) : null,
-        kapasitasPorsiPerHari: 1,
-        statusAktif: true,
-        mitraPengelola: "SCRAPE_BGN",
-      },
+    const kodeSppg = makeNewKodeSppg(codePrefix, identityKey);
+    toCreate.push({
+      kodeSppg,
+      namaSppg: row.namaSppg.slice(0, 200),
+      alamat: (row.alamat || `${row.kelurahanDesa || "-"}, ${row.kecamatan || "-"}, ${row.kabupatenKota}, ${row.provinsi}`).slice(0, 4000),
+      provinsi: row.provinsi.slice(0, 100),
+      kabupatenKota: row.kabupatenKota.slice(0, 100),
+      kecamatan: row.kecamatan ? row.kecamatan.slice(0, 100) : null,
+      kapasitasPorsiPerHari: 1,
+      statusAktif: true,
+      mitraPengelola: "SCRAPE_BGN",
     });
-    created += 1;
+  }
+
+  if (toUpdate.length > 0) {
+    for (const item of toUpdate) {
+      await prisma.sppg.update({
+        where: { id: item.id },
+        data: item.patch,
+      });
+      updated += 1;
+    }
+  }
+
+  if (toCreate.length > 0) {
+    const chunkSize = 1000;
+    for (let i = 0; i < toCreate.length; i += chunkSize) {
+      const chunk = toCreate.slice(i, i + chunkSize);
+      const r = await prisma.sppg.createMany({
+        data: chunk,
+        skipDuplicates: true,
+      });
+      created += r.count || 0;
+    }
   }
 
   const source = await upsertPublicSource({
@@ -370,6 +459,7 @@ async function withJobLock(task) {
 
 async function runBgnScrapeSync(options = {}) {
   const trigger = options.trigger || "manual";
+  const fullCrawl = options.fullCrawl === true;
   const run = async () => {
     const generatedAt = new Date();
     const sppgUrl = "https://www.bgn.go.id/operasional-sppg";
@@ -379,8 +469,9 @@ async function runBgnScrapeSync(options = {}) {
       "https://www.merahputihbgn.cloud/data-utama/bgn-sppg/data-bgn/domains-mbg";
     const rootUrl = "https://www.merahputihbgn.cloud/";
 
-    const sppgHtml = await fetchText(sppgUrl);
-    const parsedSppg = parseSppgOperasional(sppgHtml);
+    const sppgHtml = await fetchText(buildSppgPageUrl(sppgUrl, 1));
+    const parsedFirstSppg = parseSppgOperasional(sppgHtml);
+    const parsedSppg = await scrapeAllSppgPages(sppgUrl, parsedFirstSppg, { fullCrawl });
 
     // Domain tree: kalau pun domainUrl gagal, minimal rootUrl tetap dicoba.
     // (Tapi dengan path yang benar, domainUrl harusnya sukses.)
@@ -396,7 +487,12 @@ async function runBgnScrapeSync(options = {}) {
       ...parseDomainLinks(rootHtml, rootUrl),
     ];
 
-    const sppgResult = await syncSppgRows(parsedSppg.rows, generatedAt, sppgUrl, parsedSppg.updatedLabel);
+    const sppgResult = await syncSppgRows(
+      parsedSppg.rows,
+      generatedAt,
+      sppgUrl,
+      parsedFirstSppg.updatedLabel
+    );
     const domainResult = await saveDomainLinksToPublicData({
       rows: domainLinks,
       sourceUrl: domainUrl,
@@ -409,8 +505,11 @@ async function runBgnScrapeSync(options = {}) {
       fetchedAt: generatedAt.toISOString(),
       sppg: {
         totalParsed: parsedSppg.rows.length,
-        totalWebsite: parsedSppg.totalSppg,
-        updatedLabel: parsedSppg.updatedLabel,
+        totalWebsite: parsedFirstSppg.totalSppg,
+        totalPages: parsedSppg.totalPages,
+        failedPages: parsedSppg.failedPages,
+        fullCrawl,
+        updatedLabel: parsedFirstSppg.updatedLabel,
         ...sppgResult,
       },
       domains: {
