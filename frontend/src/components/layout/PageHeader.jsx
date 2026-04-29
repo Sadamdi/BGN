@@ -11,19 +11,21 @@ export default function PageHeader({ title, subtitle, actions, breadcrumb }) {
       <div
         style={{
           display: "flex",
-          alignItems: "center",
+          alignItems: "flex-start",
           justifyContent: "space-between",
           gap: 16,
           flexWrap: "wrap",
         }}
       >
-        <div>
-          <h1 className="bgn-page-title">{title}</h1>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <h1 className="bgn-page-title text-clamp-2" title={title}>{title}</h1>
           {subtitle ? (
-            <div style={{ color: token.colorTextSecondary, marginTop: 4, fontSize: 13 }}>{subtitle}</div>
+            <div className="text-clamp-2" style={{ color: token.colorTextSecondary, marginTop: 4, fontSize: 13 }} title={subtitle}>
+              {subtitle}
+            </div>
           ) : null}
         </div>
-        {actions ? <Space wrap>{actions}</Space> : null}
+        {actions ? <Space wrap style={{ flexShrink: 0 }}>{actions}</Space> : null}
       </div>
     </div>
   );

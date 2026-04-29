@@ -10,7 +10,6 @@ import {
   Tag,
   Grid,
   Skeleton,
-  Select,
   theme as antdTheme,
 } from "antd";
 import {
@@ -35,7 +34,7 @@ import * as authApi from "../../api/auth.api";
 import NotificationDrawer from "./NotificationDrawer";
 import logoIcon from "../../Media/Logo.png";
 import brandBanner from "../../Media/Banner Logo.png";
-import { useThemeStore, THEME_MODE } from "../../store/themeStore";
+import ThemeToggleButton from "../theme/ThemeToggleButton";
 
 const { Sider, Header, Content, Footer } = Layout;
 
@@ -89,9 +88,7 @@ export default function MainLayout() {
   const [contentLoading, setContentLoading] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, clearSession, setUser } = useAuthStore();
-  const themeMode = useThemeStore((s) => s.themeMode);
-  const applyThemeMode = useThemeStore((s) => s.applyThemeMode);
+  const { user, clearSession } = useAuthStore();
   const jumlahBelum = useNotifikasiStore((s) => s.jumlahBelumDibaca);
   useNotifikasi();
 
@@ -120,33 +117,9 @@ export default function MainLayout() {
     navigate("/login");
   };
 
-  const onChangeTheme = async (nextMode) => {
-    applyThemeMode(nextMode);
-    if (!user) return;
-    try {
-      await authApi.updatePreferences({ themePreference: nextMode });
-      setUser({ ...user, themePreference: nextMode });
-    } catch (_) {}
-  };
-
   const profileMenu = {
     items: [
       { key: "profil", label: <Link to="/profil">Profil saya</Link>, icon: <UserOutlined /> },
-      {
-        key: "theme-light",
-        label: "Tema: Light",
-        onClick: () => onChangeTheme(THEME_MODE.LIGHT),
-      },
-      {
-        key: "theme-dark",
-        label: "Tema: Dark",
-        onClick: () => onChangeTheme(THEME_MODE.DARK),
-      },
-      {
-        key: "theme-system",
-        label: "Tema: System",
-        onClick: () => onChangeTheme(THEME_MODE.SYSTEM),
-      },
       { type: "divider" },
       { key: "logout", label: "Keluar", icon: <LogoutOutlined />, onClick: onLogout },
     ],
@@ -204,19 +177,7 @@ export default function MainLayout() {
             onClick={() => setCollapsed(!collapsed)}
           />
           <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 8 : 12 }}>
-            {!isMobile ? (
-              <Select
-                size="small"
-                value={themeMode}
-                style={{ width: 120 }}
-                onChange={onChangeTheme}
-                options={[
-                  { value: THEME_MODE.LIGHT, label: "Light" },
-                  { value: THEME_MODE.DARK, label: "Dark" },
-                  { value: THEME_MODE.SYSTEM, label: "System" },
-                ]}
-              />
-            ) : null}
+            <ThemeToggleButton size={isMobile ? "middle" : "small"} />
             <Badge count={jumlahBelum} overflowCount={99}>
               <Button shape="circle" icon={<BellOutlined />} onClick={() => setDrawerOpen(true)} />
             </Badge>
@@ -226,8 +187,18 @@ export default function MainLayout() {
                   {user && user.namaLengkap ? user.namaLengkap.charAt(0) : "U"}
                 </Avatar>
                 {!isMobile ? (
-                  <div style={{ lineHeight: 1.2 }}>
-                    <div style={{ fontWeight: 600 }}>{user && user.namaLengkap}</div>
+                  <div style={{ lineHeight: 1.2, maxWidth: 180, minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontWeight: 600,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                      title={(user && user.namaLengkap) || ""}
+                    >
+                      {user && user.namaLengkap}
+                    </div>
                     <Tag color={PERAN_COLOR[peran]} style={{ marginRight: 0 }}>
                       {PERAN_LABEL[peran] || peran}
                     </Tag>
