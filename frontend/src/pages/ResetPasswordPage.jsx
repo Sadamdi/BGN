@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Form, Input, Button, Card, Typography, Alert, App, Space } from "antd";
 import * as authApi from "../api/auth.api";
-import brandLogo from "../Media/image.png";
+import logoIcon from "../Media/Logo.png";
 
 const { Title } = Typography;
 
@@ -62,7 +62,7 @@ export default function ResetPasswordPage() {
     <div className="auth-screen">
       <Card style={{ width: "100%", maxWidth: 440 }} className="auth-card">
         <img
-          src={brandLogo}
+          src={logoIcon}
           alt="Logo Badan Gizi Nasional"
           className="auth-card-logo"
         />
