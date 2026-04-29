@@ -34,6 +34,18 @@ function publicUser(u) {
   };
 }
 
+function mapDatabaseAvailabilityError(err) {
+  const msg = String((err && err.message) || "");
+  if (msg.includes("Can't reach database server")) {
+    throw new HttpError(
+      503,
+      "Layanan database sedang tidak tersedia. Coba beberapa saat lagi.",
+      "DATABASE_UNAVAILABLE"
+    );
+  }
+  throw err;
+}
+
 async function getThemePreference(userId) {
   if (!userId) return "SYSTEM";
   try {
@@ -82,14 +94,19 @@ async function login({ identifier, password }) {
   }
 
   const ident = String(identifier).trim();
-  const user = await prisma.pengguna.findFirst({
-    where: {
-      OR: [
-        { username: { equals: ident, mode: "insensitive" } },
-        { email: { equals: ident, mode: "insensitive" } },
-      ],
-    },
-  });
+  let user;
+  try {
+    user = await prisma.pengguna.findFirst({
+      where: {
+        OR: [
+          { username: { equals: ident, mode: "insensitive" } },
+          { email: { equals: ident, mode: "insensitive" } },
+        ],
+      },
+    });
+  } catch (err) {
+    mapDatabaseAvailabilityError(err);
+  }
 
   if (!user) {
     throw new HttpError(401, "Username atau password salah", "INVALID_CREDENTIALS");
@@ -148,10 +165,14 @@ async function login({ identifier, password }) {
     await redis.set("refresh:" + user.id, refreshToken, "EX", 7 * 24 * 60 * 60);
   } catch (_) {}
 
-  await prisma.pengguna.update({
-    where: { id: user.id },
-    data: { terakhirLogin: new Date() },
-  });
+  try {
+    await prisma.pengguna.update({
+      where: { id: user.id },
+      data: { terakhirLogin: new Date() },
+    });
+  } catch (err) {
+    mapDatabaseAvailabilityError(err);
+  }
 
   const themePreference = await getThemePreference(user.id);
   return {
@@ -173,7 +194,12 @@ async function refreshAccessToken(refreshToken) {
   if (stored && stored !== refreshToken) {
     throw new HttpError(401, "Sesi tidak dikenal. Silakan login kembali.", "REFRESH_MISMATCH");
   }
-  const user = await prisma.pengguna.findUnique({ where: { id: payload.userId } });
+  let user;
+  try {
+    user = await prisma.pengguna.findUnique({ where: { id: payload.userId } });
+  } catch (err) {
+    mapDatabaseAvailabilityError(err);
+  }
   if (!user || !user.statusAktif) {
     throw new HttpError(401, "Akun tidak aktif", "ACCOUNT_DISABLED");
   }
@@ -272,7 +298,11 @@ async function resetPassword({ token, otp, newPassword }) {
   }
   await verifyResetOtp({ token, otp });
   const passwordHash = await bcrypt.hash(String(newPassword), 12);
-  await prisma.pengguna.update({ where: { id: payload.userId }, data: { passwordHash } });
+  try {
+    await prisma.pengguna.update({ where: { id: payload.userId }, data: { passwordHash } });
+  } catch (err) {
+    mapDatabaseAvailabilityError(err);
+  }
   await getRedis().del(key);
   return { ok: true };
 }
@@ -281,12 +311,21 @@ async function ubahPassword({ userId, passwordLama, passwordBaru }) {
   if (!passwordBaru || String(passwordBaru).length < 8) {
     throw new HttpError(422, "Password baru minimal 8 karakter", "WEAK_PASSWORD");
   }
-  const user = await prisma.pengguna.findUnique({ where: { id: userId } });
+  let user;
+  try {
+    user = await prisma.pengguna.findUnique({ where: { id: userId } });
+  } catch (err) {
+    mapDatabaseAvailabilityError(err);
+  }
   if (!user) throw new HttpError(404, "Pengguna tidak ditemukan", "NOT_FOUND");
   const ok = await bcrypt.compare(String(passwordLama || ""), user.passwordHash);
   if (!ok) throw new HttpError(401, "Password lama salah", "INVALID_OLD_PASSWORD");
   const passwordHash = await bcrypt.hash(String(passwordBaru), 12);
-  await prisma.pengguna.update({ where: { id: userId }, data: { passwordHash } });
+  try {
+    await prisma.pengguna.update({ where: { id: userId }, data: { passwordHash } });
+  } catch (err) {
+    mapDatabaseAvailabilityError(err);
+  }
   return { ok: true };
 }
 
