@@ -14,6 +14,7 @@ import {
   Alert,
   Space,
   Grid,
+  theme as antdTheme,
 } from "antd";
 import {
   TeamOutlined,
@@ -67,6 +68,7 @@ const KATEGORI_LABEL = {
 };
 
 export default function DashboardPage() {
+  const { token } = antdTheme.useToken();
   const screens = Grid.useBreakpoint();
   const isMobile = !screens.md;
   const trendChartHeight = isMobile ? 240 : 320;
@@ -249,7 +251,7 @@ export default function DashboardPage() {
                     percent={stat ? Math.min(100, Math.round(stat.persentaseCakupan || 0)) : 0}
                     strokeColor={cakupanColor}
                   />
-                  <div style={{ fontSize: 12, color: "#475569" }}>
+                  <div style={{ fontSize: 12, color: token.colorTextSecondary }}>
                     Total realisasi vs kapasitas SPPG aktif hari ini
                   </div>
                 </div>
@@ -262,7 +264,7 @@ export default function DashboardPage() {
                   value={stat ? stat.alertGiziBuruk : 0}
                   prefix={<AlertOutlined style={{ color: "#ff4d4f" }} />}
                 />
-                <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>30 hari terakhir</div>
+                <div style={{ fontSize: 12, color: token.colorTextSecondary, marginTop: 4 }}>30 hari terakhir</div>
               </Card>
             </Col>
           </Row>
@@ -295,7 +297,7 @@ export default function DashboardPage() {
                           <stop offset="95%" stopColor="#1B3A6B" stopOpacity={0.05} />
                         </linearGradient>
                       </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <CartesianGrid strokeDasharray="3 3" stroke={token.colorBorderSecondary} />
                       <XAxis dataKey="label" />
                       <YAxis />
                       <RTooltip
@@ -326,7 +328,7 @@ export default function DashboardPage() {
                           <Cell key={i} fill={entry.color} />
                         ))}
                       </Pie>
-                      <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle" style={{ fontWeight: 600, fill: "#334155" }}>
+                      <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle" style={{ fontWeight: 600, fill: token.colorText }}>
                         {`Total: ${totalKategori}`}
                       </text>
                       <RTooltip />
@@ -349,7 +351,7 @@ export default function DashboardPage() {
                     <Col xs={24} md={8} lg={4}><Statistic title="Laporan + " value={(realtimeSummary.values?.LAPORAN || 0)} /></Col>
                     <Col xs={24} md={8} lg={4}><Statistic title="SPPG + " value={(realtimeSummary.values?.SPPG || 0)} /></Col>
                     <Col xs={24} md={8} lg={4}>
-                      <div style={{ fontSize: 12, color: "#64748b" }}>
+                      <div style={{ fontSize: 12, color: token.colorTextSecondary }}>
                         Zona waktu: {realtimeSummary.timezone || "Asia/Jakarta"}
                         <br />
                         Update: {realtimeSummary.updatedAt ? dayjs(realtimeSummary.updatedAt).format("DD MMM YYYY HH:mm:ss") : "-"}
@@ -402,7 +404,7 @@ export default function DashboardPage() {
                       size="small"
                       dataSource={alert.sppgBelumLapor.slice(0, 5)}
                       renderItem={(s) => (
-                        <List.Item style={{ background: "#FFF7E6", borderRadius: 6, padding: 8 }}>
+                        <List.Item style={{ background: token.colorWarningBg, borderRadius: 6, padding: 8 }}>
                           <span>{s.namaSppg}</span>
                           <Tag color="orange">{s.provinsi}</Tag>
                         </List.Item>
@@ -418,10 +420,10 @@ export default function DashboardPage() {
                       size="small"
                       dataSource={alert.penerimaGiziBermasalah.slice(0, 5)}
                       renderItem={(g) => (
-                        <List.Item style={{ background: "#FFE0E0", borderRadius: 6, padding: 8 }}>
+                        <List.Item style={{ background: token.colorErrorBg, borderRadius: 6, padding: 8 }}>
                           <div>
                             <div style={{ fontWeight: 600 }}>{g.nama}</div>
-                            <div style={{ fontSize: 11, color: "#64748b" }}>{g.sppg}</div>
+                            <div style={{ fontSize: 11, color: token.colorTextSecondary }}>{g.sppg}</div>
                           </div>
                           <Tag color={g.statusGizi === "GIZI_BURUK" ? "red" : "gold"}>{g.statusGizi}</Tag>
                         </List.Item>
@@ -451,7 +453,7 @@ export default function DashboardPage() {
                         <Space style={{ width: "100%", justifyContent: "space-between" }}>
                           <div>
                             <strong>{item.indikator}</strong> - {item.namaWilayah}
-                            <div style={{ fontSize: 12, color: "#64748b" }}>
+                            <div style={{ fontSize: 12, color: token.colorTextSecondary }}>
                               {item.kategori} | {item.levelWilayah} | {item.tahun} | sumber: {item.sumber?.nama || "-"}
                             </div>
                           </div>
