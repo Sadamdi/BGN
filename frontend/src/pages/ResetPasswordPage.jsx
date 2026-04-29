@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Form, Input, Button, Card, Typography, Alert, App, Space } from "antd";
 import * as authApi from "../api/auth.api";
+import brandLogo from "../Media/image.png";
 
 const { Title } = Typography;
 
@@ -60,6 +61,11 @@ export default function ResetPasswordPage() {
   return (
     <div className="auth-screen">
       <Card style={{ width: "100%", maxWidth: 440 }} className="auth-card">
+        <img
+          src={brandLogo}
+          alt="Logo Badan Gizi Nasional"
+          className="auth-card-logo"
+        />
         <Title level={4}>Reset Password + OTP</Title>
         {error ? <Alert type="error" message={error} showIcon style={{ marginBottom: 12 }} /> : null}
         <Form form={form} layout="vertical" onFinish={onFinish}>
