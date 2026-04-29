@@ -32,7 +32,8 @@ import { useNotifikasiStore } from "../../store/notifikasiStore";
 import useNotifikasi from "../../hooks/useNotifikasi";
 import * as authApi from "../../api/auth.api";
 import NotificationDrawer from "./NotificationDrawer";
-import brandLogo from "../../Media/image.png";
+import logoIcon from "../../Media/Logo.png";
+import brandBanner from "../../Media/Banner Logo.png";
 
 const { Sider, Header, Content, Footer } = Layout;
 
@@ -139,20 +140,18 @@ export default function MainLayout() {
           }}
         >
           {collapsed ? (
-            "BGN"
+            <img
+              src={logoIcon}
+              alt="Logo Badan Gizi Nasional"
+              style={{ width: 32, height: 32, objectFit: "contain", borderRadius: "50%" }}
+            />
           ) : (
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <img
-                src={brandLogo}
-                alt="Logo Badan Gizi Nasional"
-                style={{ width: 42, height: 42, objectFit: "contain", flexShrink: 0 }}
+                src={brandBanner}
+                alt="Banner Badan Gizi Nasional"
+                style={{ width: "100%", maxWidth: 170, objectFit: "contain", display: "block" }}
               />
-              <div>
-                <div>SIPGN-BGN</div>
-                <div style={{ fontSize: 11, fontWeight: 400, color: "#cbd5e1", marginTop: 2 }}>
-                  Pemenuhan Gizi Nasional
-                </div>
-              </div>
             </div>
           )}
         </div>
