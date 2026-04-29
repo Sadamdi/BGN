@@ -1,4 +1,5 @@
 import api from "./axios";
+import { useAuthStore } from "../store/authStore";
 
 export function getRingkasanPublik(tahun) {
   const params = tahun ? { tahun } : {};
@@ -29,5 +30,18 @@ export function createRealtimeStream(onEvent, onError) {
 }
 
 export function syncScrapeData() {
-  return api.post("/public-data/sync-scrape").then((r) => r.data);
+  // Backend `verifyToken` baca token dari `Authorization` header atau dari query param `token`.
+  // Untuk menghindari kasus token header tidak ke-set (mis. state store belum terhidrasi),
+  // kirim juga token via query param sebagai fallback.
+  const accessToken = useAuthStore.getState().accessToken;
+  const token = accessToken || (() => {
+    try {
+      const raw = localStorage.getItem("sipgn-auth");
+      return raw ? JSON.parse(raw)?.state?.accessToken : null;
+    } catch (_) {
+      return null;
+    }
+  })();
+
+  return api.post("/public-data/sync-scrape", null, token ? { params: { token } } : undefined).then((r) => r.data);
 }
