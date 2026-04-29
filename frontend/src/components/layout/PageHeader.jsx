@@ -1,7 +1,8 @@
 import React from "react";
-import { Breadcrumb, Space } from "antd";
+import { Breadcrumb, Space, theme as antdTheme } from "antd";
 
 export default function PageHeader({ title, subtitle, actions, breadcrumb }) {
+  const { token } = antdTheme.useToken();
   return (
     <div style={{ marginBottom: 16 }}>
       {breadcrumb && breadcrumb.length > 0 ? (
@@ -19,7 +20,7 @@ export default function PageHeader({ title, subtitle, actions, breadcrumb }) {
         <div>
           <h1 className="bgn-page-title">{title}</h1>
           {subtitle ? (
-            <div style={{ color: "#475569", marginTop: 4, fontSize: 13 }}>{subtitle}</div>
+            <div style={{ color: token.colorTextSecondary, marginTop: 4, fontSize: 13 }}>{subtitle}</div>
           ) : null}
         </div>
         {actions ? <Space wrap>{actions}</Space> : null}

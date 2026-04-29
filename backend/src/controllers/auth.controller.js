@@ -107,6 +107,7 @@ async function getMe(req, res, next) {
       include: { sppg: true },
     });
     if (!user) return res.status(404).json({ success: false, message: "Pengguna tidak ditemukan", code: "NOT_FOUND" });
+    const themePreference = await auth.getThemePreference(user.id);
     return sukses(res, {
       id: user.id,
       username: user.username,
@@ -117,7 +118,18 @@ async function getMe(req, res, next) {
       sppg: user.sppg,
       wilayahZona: user.wilayahZona,
       terakhirLogin: user.terakhirLogin,
+      themePreference,
     });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function patchMePreferences(req, res, next) {
+  try {
+    const { themePreference } = req.body || {};
+    const saved = await auth.setThemePreference(req.user.userId, themePreference);
+    return sukses(res, { themePreference: saved }, "Preferensi tema disimpan");
   } catch (err) {
     next(err);
   }
@@ -133,4 +145,5 @@ module.exports = {
   postResetPassword,
   postUbahPassword,
   getMe,
+  patchMePreferences,
 };
