@@ -27,3 +27,7 @@ export function createRealtimeStream(onEvent, onError) {
   es.onerror = (err) => onError && onError(err);
   return es;
 }
+
+export function syncScrapeData() {
+  return api.post("/public-data/sync-scrape").then((r) => r.data);
+}
