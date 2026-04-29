@@ -17,4 +17,13 @@ router.post(
   ctrl.syncScrapeData
 );
 
+// Alias untuk menghindari confusion saat endpoint dibuka langsung dari browser.
+// Endpoint utama tetap `POST /api/public-data/sync-scrape`.
+router.get(
+  "/sync-scrape",
+  verifyToken,
+  requireRole("ADMIN", "PEJABAT_BGN", "PENGAWAS_GIZI"),
+  ctrl.syncScrapeData
+);
+
 module.exports = router;
