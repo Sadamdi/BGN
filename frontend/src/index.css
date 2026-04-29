@@ -29,6 +29,13 @@ body {
   box-shadow: 0 16px 32px rgba(15, 23, 42, 0.08);
 }
 
+@media (hover: none) {
+  .bgn-stat-card:hover {
+    transform: none;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04);
+  }
+}
+
 .leaflet-container {
   border-radius: 12px;
 }
@@ -64,6 +71,23 @@ body {
   border-radius: 20px;
   box-shadow: 0 24px 48px rgba(15, 23, 42, 0.12);
   border: 1px solid #e5e7eb;
+}
+
+@media (max-width: 991px) {
+  .auth-screen {
+    align-items: flex-start;
+    padding: 16px;
+    gap: 8px;
+  }
+
+  .bgn-login-side {
+    max-width: 100% !important;
+    padding: 8px !important;
+  }
+
+  .auth-card {
+    border-radius: 14px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

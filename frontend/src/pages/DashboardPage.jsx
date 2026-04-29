@@ -13,6 +13,7 @@ import {
   Empty,
   Alert,
   Space,
+  Grid,
 } from "antd";
 import {
   TeamOutlined,
@@ -66,6 +67,12 @@ const KATEGORI_LABEL = {
 };
 
 export default function DashboardPage() {
+  const screens = Grid.useBreakpoint();
+  const isMobile = !screens.md;
+  const trendChartHeight = isMobile ? 240 : 320;
+  const pieChartHeight = isMobile ? 240 : 280;
+  const mapHeight = isMobile ? 320 : 420;
+  const alertHeight = isMobile ? "auto" : 420;
   const containerRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -279,7 +286,7 @@ export default function DashboardPage() {
                   </Space>
                 }
               >
-                <div style={{ width: "100%", height: 320 }}>
+                <div style={{ width: "100%", height: trendChartHeight }}>
                   <ResponsiveContainer>
                     <AreaChart data={tren.map((d) => ({ ...d, label: dayjs(d.tanggal).format("DD/MM") }))}>
                       <defs>
@@ -303,7 +310,7 @@ export default function DashboardPage() {
             </Col>
             <Col xs={24} lg={8}>
               <Card title="Distribusi Penerima per Kategori">
-                <div style={{ width: "100%", height: 280 }}>
+                <div style={{ width: "100%", height: pieChartHeight }}>
                   <ResponsiveContainer>
                     <PieChart>
                       <Pie
@@ -319,13 +326,13 @@ export default function DashboardPage() {
                           <Cell key={i} fill={entry.color} />
                         ))}
                       </Pie>
+                      <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle" style={{ fontWeight: 600, fill: "#334155" }}>
+                        {`Total: ${totalKategori}`}
+                      </text>
                       <RTooltip />
                       <Legend />
                     </PieChart>
                   </ResponsiveContainer>
-                </div>
-                <div style={{ textAlign: "center", marginTop: -180, fontWeight: 600 }}>
-                  Total: {totalKategori}
                 </div>
               </Card>
             </Col>
@@ -356,7 +363,7 @@ export default function DashboardPage() {
             </Col>
             <Col xs={24} lg={14}>
               <Card title="Sebaran SPPG" bodyStyle={{ padding: 0 }}>
-                <div style={{ height: 420 }}>
+                <div style={{ height: mapHeight }}>
                   <MapContainer center={[-2.5, 118]} zoom={5} style={{ height: "100%", width: "100%" }}>
                     <TileLayer attribution="&copy; OpenStreetMap" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                     {sebaran
@@ -387,7 +394,7 @@ export default function DashboardPage() {
               </Card>
             </Col>
             <Col xs={24} lg={10}>
-              <Card title="Alert & Notifikasi" style={{ height: 420, overflow: "auto" }}>
+              <Card title="Alert & Notifikasi" style={{ height: alertHeight, overflow: "auto" }}>
                 {(alert.sppgBelumLapor || []).length > 0 ? (
                   <div style={{ marginBottom: 12 }}>
                     <div style={{ fontWeight: 600, marginBottom: 6 }}>SPPG belum lapor 2 hari berturut-turut</div>

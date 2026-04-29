@@ -13,6 +13,7 @@ import {
   App,
   Typography,
   Alert,
+  Grid,
 } from "antd";
 import {
   PlusOutlined,
@@ -35,6 +36,9 @@ const KATEGORI_LABEL = { PESERTA_DIDIK: "Peserta Didik", BALITA: "Balita", IBU_H
 const STATUS_GIZI_COLOR = { GIZI_BURUK: "red", GIZI_KURANG: "gold", GIZI_BAIK: "green", GIZI_LEBIH: "orange" };
 
 export default function PenerimaListPage() {
+  const screens = Grid.useBreakpoint();
+  const isMobile = !screens.md;
+  const filterControlStyle = (desktopWidth) => ({ width: isMobile ? "100%" : desktopWidth, maxWidth: "100%" });
   const navigate = useNavigate();
   const { user, hasRole } = useAuthStore();
   const { message, modal } = App.useApp();
@@ -222,11 +226,16 @@ export default function PenerimaListPage() {
 
       <Card style={{ marginBottom: 16 }}>
         <Space wrap style={{ width: "100%" }}>
-          <Input.Search placeholder="Cari NIK / Nama" allowClear onChange={(e) => onSearch(e.target.value)} style={{ width: 260 }} />
+          <Input.Search
+            placeholder="Cari NIK / Nama"
+            allowClear
+            onChange={(e) => onSearch(e.target.value)}
+            style={filterControlStyle(260)}
+          />
           <Select
             placeholder="Kategori"
             allowClear
-            style={{ minWidth: 160 }}
+            style={filterControlStyle(180)}
             value={filter.kategori || undefined}
             onChange={(v) => setFilter((f) => ({ ...f, kategori: v || "" }))}
             options={Object.entries(KATEGORI_LABEL).map(([k, v]) => ({ value: k, label: v }))}
@@ -236,7 +245,7 @@ export default function PenerimaListPage() {
               placeholder="SPPG"
               allowClear
               showSearch
-              style={{ minWidth: 240 }}
+              style={filterControlStyle(260)}
               value={filter.sppgId || undefined}
               onChange={(v) => setFilter((f) => ({ ...f, sppgId: v || "" }))}
               options={sppgOptions.map((s) => ({ value: s.id, label: s.namaSppg }))}
@@ -246,7 +255,7 @@ export default function PenerimaListPage() {
           <Select
             placeholder="Status"
             allowClear
-            style={{ minWidth: 140 }}
+            style={filterControlStyle(160)}
             value={filter.statusAktif || undefined}
             onChange={(v) => setFilter((f) => ({ ...f, statusAktif: v || "" }))}
             options={[
