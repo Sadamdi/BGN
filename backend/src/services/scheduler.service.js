@@ -49,6 +49,19 @@ function startSchedulers() {
     laporan.jalankanJadwalAktif().catch((e) => console.error("[cron] laporan terjadwal:", e.message));
   });
 
+  // sinkron scraping BGN + domain MBG tiap jam
+  cron.schedule(
+    "10 * * * *",
+    async () => {
+      try {
+        await runScript("bgn-scrape-sync", "src/scripts/ingest/bgn-scrape.ingest.js");
+      } catch (e) {
+        console.error("[cron] bgn scrape sync:", e.message);
+      }
+    },
+    { timezone: "Asia/Jakarta" }
+  );
+
   // Ingest hybrid + generator realtime tiap hari jam 00:05 WIB
   cron.schedule(
     "5 0 * * *",

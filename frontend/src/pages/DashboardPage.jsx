@@ -26,6 +26,7 @@ import {
   ArrowDownOutlined,
   ReloadOutlined,
   DownloadOutlined,
+  SyncOutlined,
 } from "@ant-design/icons";
 import {
   AreaChart,
@@ -47,6 +48,7 @@ import html2canvas from "html2canvas";
 import PageHeader from "../components/layout/PageHeader";
 import * as dashApi from "../api/dashboard.api";
 import * as publicDataApi from "../api/publicData.api";
+import { useAuthStore } from "../store/authStore";
 
 const RANGE_OPTIONS = [
   { value: 7, label: "7 Hari" },
@@ -69,6 +71,7 @@ const KATEGORI_LABEL = {
 };
 
 export default function DashboardPage() {
+  const { hasRole } = useAuthStore();
   const { token } = antdTheme.useToken();
   const screens = Grid.useBreakpoint();
   const isMobile = !screens.md;
@@ -89,6 +92,7 @@ export default function DashboardPage() {
   const [realtimeSummary, setRealtimeSummary] = useState(null);
   const [streamStatus, setStreamStatus] = useState("Menghubungkan...");
   const [terakhir, setTerakhir] = useState(null);
+  const [syncLoading, setSyncLoading] = useState(false);
 
   const fetchAll = async () => {
     setLoading(true);
@@ -176,6 +180,23 @@ export default function DashboardPage() {
     a.click();
   };
 
+  const onSyncScrape = async () => {
+    setSyncLoading(true);
+    try {
+      const r = await publicDataApi.syncScrapeData();
+      if (r && r.data && r.data.skipped) {
+        setError("Sinkron sedang berjalan, coba lagi sebentar.");
+      } else {
+        setError(null);
+      }
+      await fetchAll();
+    } catch (err) {
+      setError((err.response && err.response.data && err.response.data.message) || "Sinkron data gagal");
+    } finally {
+      setSyncLoading(false);
+    }
+  };
+
   return (
     <div ref={containerRef}>
       <PageHeader
@@ -187,6 +208,11 @@ export default function DashboardPage() {
         }
         actions={
           <Space>
+            {hasRole("ADMIN", "PEJABAT_BGN") ? (
+              <Button icon={<SyncOutlined />} onClick={onSyncScrape} loading={syncLoading}>
+                Sinkron Data
+              </Button>
+            ) : null}
             <Button icon={<ReloadOutlined />} onClick={fetchAll} loading={loading}>
               Refresh
             </Button>
