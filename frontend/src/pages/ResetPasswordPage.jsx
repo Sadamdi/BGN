@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Form, Input, Button, Card, Typography, Alert, App, Space, theme as antdTheme } from "antd";
 import * as authApi from "../api/auth.api";
 import logoIcon from "../Media/Logo.png";
+import ThemeToggleButton from "../components/theme/ThemeToggleButton";
 
 const { Title } = Typography;
 
@@ -61,6 +62,9 @@ export default function ResetPasswordPage() {
 
   return (
     <div className="auth-screen">
+      <div className="auth-theme-toggle">
+        <ThemeToggleButton />
+      </div>
       <Card style={{ width: "100%", maxWidth: 440 }} className="auth-card">
         <img
           src={logoIcon}
