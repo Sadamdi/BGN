@@ -154,23 +154,34 @@ export default function PenerimaListPage() {
 
   const columns = useMemo(() => {
     const cols = [
-      { title: "No", render: (_, __, idx) => (pagination.current - 1) * pagination.pageSize + idx + 1, width: 60 },
-      { title: "NIK", dataIndex: "nikMasked", render: (v) => <span style={{ fontFamily: "monospace" }}>{v}</span> },
+      {
+        title: "No",
+        render: (_, __, idx) => (pagination.current - 1) * pagination.pageSize + idx + 1,
+        width: 60,
+        responsive: ["md"],
+      },
+      {
+        title: "NIK",
+        dataIndex: "nikMasked",
+        render: (v) => <span style={{ fontFamily: "monospace" }}>{v}</span>,
+      },
       { title: "Nama Lengkap", dataIndex: "namaLengkap", sorter: true },
       {
         title: "Kategori",
         dataIndex: "kategori",
+        responsive: ["md"],
         render: (v) => <Tag color={KATEGORI_COLOR[v]}>{KATEGORI_LABEL[v] || v}</Tag>,
       },
-      { title: "Usia", dataIndex: "usiaLabel" },
-      { title: "Satuan Pendidikan", dataIndex: "satuanPendidikan" },
+      { title: "Usia", dataIndex: "usiaLabel", responsive: ["lg"] },
+      { title: "Satuan Pendidikan", dataIndex: "satuanPendidikan", responsive: ["lg"] },
     ];
     if (showSppgFilter) {
-      cols.push({ title: "SPPG", render: (r) => (r.sppg ? r.sppg.namaSppg : "-") });
+      cols.push({ title: "SPPG", responsive: ["lg"], render: (r) => (r.sppg ? r.sppg.namaSppg : "-") });
     }
     cols.push({
       title: "Status Gizi",
       dataIndex: "statusGiziTerakhir",
+      responsive: ["md"],
       render: (v) => (v ? <Tag color={STATUS_GIZI_COLOR[v]}>{v}</Tag> : <span style={{ color: "#94a3b8" }}>—</span>),
     });
     cols.push({
@@ -181,11 +192,11 @@ export default function PenerimaListPage() {
     cols.push({
       title: "Aksi",
       render: (r) => (
-        <Space>
-          <Button size="small" icon={<EyeOutlined />} onClick={() => navigate(`/penerima/${r.id}`)}>
-            Lihat
+        <Space wrap size={6}>
+          <Button size="small" icon={<EyeOutlined />} onClick={() => navigate(`/penerima/${r.id}`)} title="Lihat detail">
+            {isMobile ? "Lihat" : "Lihat"}
           </Button>
-          <Button size="small" icon={<EditOutlined />} onClick={() => navigate(`/penerima/${r.id}/edit`)}>
+          <Button size="small" icon={<EditOutlined />} onClick={() => navigate(`/penerima/${r.id}/edit`)} title="Ubah data">
             Edit
           </Button>
           {r.statusAktif ? (
@@ -198,7 +209,7 @@ export default function PenerimaListPage() {
     });
     return cols;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pagination, showSppgFilter]);
+  }, [pagination, showSppgFilter, isMobile]);
 
   return (
     <div>
@@ -206,16 +217,35 @@ export default function PenerimaListPage() {
         title="Penerima Manfaat"
         subtitle="Kelola data penerima manfaat program MBG"
         actions={
-          <Space>
+          <Space
+            wrap
+            style={{
+              width: isMobile ? "100%" : "auto",
+              justifyContent: isMobile ? "flex-start" : "flex-end",
+            }}
+          >
             {hasRole("ADMIN", "OPERATOR_SPPG") ? (
               <>
-                <Button icon={<DownloadOutlined />} onClick={onDownloadTemplate}>
+                <Button
+                  icon={<DownloadOutlined />}
+                  onClick={onDownloadTemplate}
+                  style={isMobile ? { width: "100%" } : undefined}
+                >
                   Template Excel
                 </Button>
-                <Button icon={<UploadOutlined />} onClick={() => setImportOpen(true)}>
+                <Button
+                  icon={<UploadOutlined />}
+                  onClick={() => setImportOpen(true)}
+                  style={isMobile ? { width: "100%" } : undefined}
+                >
                   Import Excel
                 </Button>
-                <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate("/penerima/tambah")}>
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  onClick={() => navigate("/penerima/tambah")}
+                  style={isMobile ? { width: "100%" } : undefined}
+                >
                   Tambah Penerima
                 </Button>
               </>
@@ -279,14 +309,17 @@ export default function PenerimaListPage() {
             current: pagination.current,
             pageSize: pagination.pageSize,
             total: pagination.total,
-            showSizeChanger: true,
+            size: isMobile ? "small" : "default",
+            showSizeChanger: !isMobile,
+            simple: isMobile,
             showTotal: (t) => `Total ${t} data`,
             onChange: (page, pageSize) => {
               setPagination((p) => ({ ...p, current: page, pageSize }));
               fetchData({ page, limit: pageSize });
             },
           }}
-          scroll={{ x: 1200 }}
+          size={isMobile ? "small" : "middle"}
+          scroll={{ x: isMobile ? 860 : 1200 }}
           expandable={{
             expandedRowRender: (record) =>
               record.tanggalPengukuranTerakhir ? (
