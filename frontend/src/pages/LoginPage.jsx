@@ -97,9 +97,10 @@ export default function LoginPage() {
 
       <div
         style={{
-          width: 480,
+          width: "100%",
+          maxWidth: 480,
           background: "transparent",
-          padding: 32,
+          padding: "24px 16px",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -140,7 +141,7 @@ export default function LoginPage() {
               <Input.Password prefix={<LockOutlined />} placeholder="Masukkan password" autoComplete="current-password" />
             </Form.Item>
 
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
               <Form.Item name="ingatSaya" valuePropName="checked" noStyle>
                 <Checkbox>Ingat saya</Checkbox>
               </Form.Item>

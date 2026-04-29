@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Card, Table, Tag, Button, Space, App, DatePicker, Select } from "antd";
+import { Card, Table, Tag, Button, Space, App, DatePicker, Select, Grid } from "antd";
 import { PlusOutlined, CheckCircleOutlined, AuditOutlined, FileImageOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 
@@ -12,6 +12,9 @@ import { useAuthStore } from "../store/authStore";
 const STATUS_COLOR = { DRAFT: "default", TERKONFIRMASI: "blue", TERVALIDASI: "green" };
 
 export default function DistribusiListPage() {
+  const screens = Grid.useBreakpoint();
+  const isMobile = !screens.md;
+  const filterControlStyle = (desktopWidth) => ({ width: isMobile ? "100%" : desktopWidth, maxWidth: "100%" });
   const navigate = useNavigate();
   const { hasRole } = useAuthStore();
   const { message } = App.useApp();
@@ -119,13 +122,13 @@ export default function DistribusiListPage() {
         }
       />
       <Card style={{ marginBottom: 16 }}>
-        <Space wrap>
+        <Space wrap style={{ width: "100%" }}>
           {hasRole("ADMIN", "PENGAWAS_GIZI", "PEJABAT_BGN") ? (
             <Select
               showSearch
               placeholder="SPPG"
               allowClear
-              style={{ minWidth: 240 }}
+              style={filterControlStyle(260)}
               value={filter.sppgId || undefined}
               onChange={(v) => setFilter((f) => ({ ...f, sppgId: v || "" }))}
               options={sppgOptions.map((s) => ({ value: s.id, label: s.namaSppg }))}
@@ -135,12 +138,13 @@ export default function DistribusiListPage() {
           <Select
             placeholder="Status"
             allowClear
-            style={{ minWidth: 160 }}
+            style={filterControlStyle(180)}
             value={filter.status || undefined}
             onChange={(v) => setFilter((f) => ({ ...f, status: v || "" }))}
             options={["DRAFT", "TERKONFIRMASI", "TERVALIDASI"].map((v) => ({ value: v, label: v }))}
           />
           <DatePicker.RangePicker
+            style={filterControlStyle(280)}
             value={filter.range}
             onChange={(v) => setFilter((f) => ({ ...f, range: v }))}
           />

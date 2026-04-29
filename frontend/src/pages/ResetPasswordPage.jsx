@@ -59,14 +59,14 @@ export default function ResetPasswordPage() {
 
   return (
     <div className="auth-screen">
-      <Card style={{ width: 440 }} className="auth-card">
+      <Card style={{ width: "100%", maxWidth: 440 }} className="auth-card">
         <Title level={4}>Reset Password + OTP</Title>
         {error ? <Alert type="error" message={error} showIcon style={{ marginBottom: 12 }} /> : null}
         <Form form={form} layout="vertical" onFinish={onFinish}>
           <Form.Item name="otp" label="OTP (6 digit)" rules={[{ required: true, message: "OTP wajib diisi" }]}>
             <Input placeholder="Contoh: 123456" maxLength={6} onChange={() => setOtpValid(false)} />
           </Form.Item>
-          <Space style={{ marginBottom: 12 }}>
+          <Space wrap style={{ marginBottom: 12 }}>
             <Button onClick={onVerifyOtp} loading={verifyingOtp}>Verifikasi OTP</Button>
             {otpValid ? <span style={{ color: "#16a34a" }}>OTP tervalidasi</span> : null}
           </Space>

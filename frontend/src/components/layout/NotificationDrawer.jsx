@@ -28,7 +28,7 @@ export default function NotificationDrawer({ open, onClose }) {
       placement="right"
       onClose={onClose}
       open={open}
-      width={420}
+      width="min(420px, calc(100vw - 16px))"
       extra={
         <Button size="small" onClick={onTandaiSemua} disabled={!items.some((n) => !n.dibaca)}>
           Tandai semua dibaca

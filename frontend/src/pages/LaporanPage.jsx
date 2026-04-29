@@ -16,6 +16,7 @@ import {
   Input,
   List,
   Tag,
+  Grid,
 } from "antd";
 import { DownloadOutlined, FilePdfOutlined, FileExcelOutlined, ReloadOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
@@ -33,6 +34,9 @@ const JENIS = [
 ];
 
 export default function LaporanPage() {
+  const screens = Grid.useBreakpoint();
+  const isMobile = !screens.md;
+  const filterControlStyle = (desktopWidth) => ({ width: isMobile ? "100%" : desktopWidth, maxWidth: "100%" });
   const [jenis, setJenis] = useState("distribusi");
   const [filter, setFilter] = useState({ periode: [dayjs().subtract(30, "day"), dayjs()], sppgId: null, provinsi: null, kategori: null });
   const [preview, setPreview] = useState(null);
@@ -150,15 +154,16 @@ export default function LaporanPage() {
         </Col>
         <Col xs={24} lg={18}>
           <Card title="Filter">
-            <Space wrap>
+            <Space wrap style={{ width: "100%" }}>
               <DatePicker.RangePicker
+                style={filterControlStyle(300)}
                 value={filter.periode}
                 onChange={(v) => setFilter((f) => ({ ...f, periode: v }))}
               />
               <Select
                 placeholder="Provinsi"
                 allowClear
-                style={{ minWidth: 220 }}
+                style={filterControlStyle(220)}
                 value={filter.provinsi || undefined}
                 onChange={(v) => setFilter((f) => ({ ...f, provinsi: v || null }))}
                 options={provList.map((p) => ({ value: p.provinsi, label: p.provinsi }))}
@@ -167,7 +172,7 @@ export default function LaporanPage() {
                 placeholder="SPPG"
                 allowClear
                 showSearch
-                style={{ minWidth: 240 }}
+                style={filterControlStyle(260)}
                 value={filter.sppgId || undefined}
                 onChange={(v) => setFilter((f) => ({ ...f, sppgId: v || null }))}
                 options={sppgOptions.map((s) => ({ value: s.id, label: s.namaSppg }))}
@@ -176,7 +181,7 @@ export default function LaporanPage() {
               <Select
                 placeholder="Kategori"
                 allowClear
-                style={{ minWidth: 180 }}
+                style={filterControlStyle(200)}
                 value={filter.kategori || undefined}
                 onChange={(v) => setFilter((f) => ({ ...f, kategori: v || null }))}
                 options={[
