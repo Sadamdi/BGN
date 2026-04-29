@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, Table, Tag, Input, Select, Button, Space, App, Grid } from "antd";
-import { PlusOutlined, EyeOutlined, EditOutlined, DownloadOutlined, ReloadOutlined } from "@ant-design/icons";
+import { PlusOutlined, EyeOutlined, EditOutlined, DownloadOutlined, ReloadOutlined, SyncOutlined } from "@ant-design/icons";
 
 import PageHeader from "../components/layout/PageHeader";
 import * as sppgApi from "../api/sppg.api";
+import * as publicDataApi from "../api/publicData.api";
 import { useAuthStore } from "../store/authStore";
 
 export default function SppgListPage() {
@@ -20,6 +21,7 @@ export default function SppgListPage() {
   const [pagination, setPagination] = useState({ current: 1, pageSize: 25, total: 0 });
   const [filter, setFilter] = useState({ search: "", provinsi: "", statusAktif: "" });
   const [provList, setProvList] = useState([]);
+  const [syncLoading, setSyncLoading] = useState(false);
 
   const fetchData = async (override = {}) => {
     setLoading(true);
@@ -78,6 +80,23 @@ export default function SppgListPage() {
     }
   };
 
+  const onSyncScrape = async () => {
+    setSyncLoading(true);
+    try {
+      const r = await publicDataApi.syncScrapeData();
+      if (r && r.data && r.data.skipped) {
+        message.warning("Sinkron sedang berjalan. Coba lagi sebentar.");
+      } else {
+        message.success("Sinkron data berhasil dijalankan.");
+      }
+      fetchData({ page: 1 });
+    } catch (err) {
+      message.error((err.response && err.response.data && err.response.data.message) || "Sinkron data gagal");
+    } finally {
+      setSyncLoading(false);
+    }
+  };
+
   const columns = [
     { title: "Kode", dataIndex: "kodeSppg" },
     { title: "Nama SPPG", dataIndex: "namaSppg" },
@@ -119,6 +138,11 @@ export default function SppgListPage() {
         title="SPPG (Satuan Pelayanan Pemenuhan Gizi)"
         actions={
           <Space>
+            {hasRole("ADMIN", "PEJABAT_BGN") ? (
+              <Button icon={<SyncOutlined />} loading={syncLoading} onClick={onSyncScrape}>
+                Sinkron Data
+              </Button>
+            ) : null}
             <Button icon={<DownloadOutlined />} onClick={onDownloadGeo}>
               Export GeoJSON
             </Button>
