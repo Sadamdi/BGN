@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, Table, Tag, Button, Space, App, DatePicker, Select, Grid } from "antd";
-import { PlusOutlined, CheckCircleOutlined, AuditOutlined, FileImageOutlined } from "@ant-design/icons";
+import { PlusOutlined, CheckCircleOutlined, AuditOutlined, FileImageOutlined, SyncOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 
 import PageHeader from "../components/layout/PageHeader";
 import * as distApi from "../api/distribusi.api";
 import * as sppgApi from "../api/sppg.api";
+import * as publicDataApi from "../api/publicData.api";
 import { useAuthStore } from "../store/authStore";
 
 const STATUS_COLOR = { DRAFT: "default", TERKONFIRMASI: "blue", TERVALIDASI: "green" };
@@ -24,6 +25,7 @@ export default function DistribusiListPage() {
   const [pagination, setPagination] = useState({ current: 1, pageSize: 25, total: 0 });
   const [filter, setFilter] = useState({ sppgId: "", status: "", range: null });
   const [sppgOptions, setSppgOptions] = useState([]);
+  const [syncLoading, setSyncLoading] = useState(false);
 
   const fetchData = async (override = {}) => {
     setLoading(true);
@@ -71,6 +73,23 @@ export default function DistribusiListPage() {
     }
   };
 
+  const onSyncScrape = async () => {
+    setSyncLoading(true);
+    try {
+      const r = await publicDataApi.syncScrapeData();
+      if (r && r.data && r.data.skipped) {
+        message.warning("Sinkron sedang berjalan. Coba lagi sebentar.");
+      } else {
+        message.success("Sinkron data berhasil dijalankan.");
+      }
+      fetchData({ page: 1 });
+    } catch (err) {
+      message.error((err.response && err.response.data && err.response.data.message) || "Sinkron data gagal");
+    } finally {
+      setSyncLoading(false);
+    }
+  };
+
   const columns = [
     { title: "Tanggal", dataIndex: "tanggalDistribusi", render: (v) => dayjs(v).format("DD MMM YYYY") },
     { title: "SPPG", render: (r) => r.sppg && r.sppg.namaSppg },
@@ -114,11 +133,18 @@ export default function DistribusiListPage() {
       <PageHeader
         title="Distribusi MBG"
         actions={
-          hasRole("OPERATOR_SPPG", "ASISTEN_LAPANGAN", "ADMIN") ? (
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate("/distribusi/input")}>
-              Input Distribusi
-            </Button>
-          ) : null
+          <Space>
+            {hasRole("ADMIN", "PEJABAT_BGN") ? (
+              <Button icon={<SyncOutlined />} loading={syncLoading} onClick={onSyncScrape}>
+                Sinkron Data
+              </Button>
+            ) : null}
+            {hasRole("OPERATOR_SPPG", "ASISTEN_LAPANGAN", "ADMIN") ? (
+              <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate("/distribusi/input")}>
+                Input Distribusi
+              </Button>
+            ) : null}
+          </Space>
         }
       />
       <Card style={{ marginBottom: 16 }}>

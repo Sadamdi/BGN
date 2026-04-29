@@ -2,6 +2,7 @@
 
 const { prisma } = require("../config/database");
 const { sukses } = require("../utils/response");
+const { runBgnScrapeSync } = require("../services/bgnScrapeSync.service");
 
 async function getRingkasanPublik(req, res, next) {
   try {
@@ -103,8 +104,28 @@ async function realtimeStream(req, res, next) {
   }
 }
 
+async function syncScrapeData(req, res, next) {
+  try {
+    const result = await runBgnScrapeSync({ trigger: "manual_api" });
+    if (result && result.skipped) {
+      return sukses(
+        res,
+        {
+          skipped: true,
+          reason: result.reason,
+        },
+        "Sinkron sedang berjalan, coba lagi sebentar"
+      );
+    }
+    return sukses(res, result, "Sinkron scraping BGN berhasil dijalankan");
+  } catch (err) {
+    return next(err);
+  }
+}
+
 module.exports = {
   getRingkasanPublik,
   getRealtimeSummary,
   realtimeStream,
+  syncScrapeData,
 };
