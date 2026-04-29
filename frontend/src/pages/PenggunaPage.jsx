@@ -11,6 +11,7 @@ import {
   Select,
   Progress,
   App,
+  Grid,
 } from "antd";
 import { PlusOutlined, EditOutlined, KeyOutlined, ReloadOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
@@ -39,6 +40,9 @@ function strength(p) {
 }
 
 export default function PenggunaPage() {
+  const screens = Grid.useBreakpoint();
+  const isMobile = !screens.md;
+  const filterControlStyle = (desktopWidth) => ({ width: isMobile ? "100%" : desktopWidth, maxWidth: "100%" });
   const { message, modal } = App.useApp();
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -166,11 +170,11 @@ export default function PenggunaPage() {
         }
       />
       <Card style={{ marginBottom: 16 }}>
-        <Space wrap>
+        <Space wrap style={{ width: "100%" }}>
           <Input.Search
             placeholder="Cari nama / username"
             allowClear
-            style={{ width: 260 }}
+            style={filterControlStyle(260)}
             onSearch={(v) => {
               setFilter((f) => ({ ...f, search: v }));
               fetchData({ page: 1 });
@@ -179,7 +183,7 @@ export default function PenggunaPage() {
           <Select
             placeholder="Peran"
             allowClear
-            style={{ minWidth: 180 }}
+            style={filterControlStyle(200)}
             value={filter.peran || undefined}
             onChange={(v) => setFilter((f) => ({ ...f, peran: v || "" }))}
             options={PERAN_OPTIONS}
@@ -187,7 +191,7 @@ export default function PenggunaPage() {
           <Select
             placeholder="Status"
             allowClear
-            style={{ minWidth: 140 }}
+            style={filterControlStyle(160)}
             value={filter.statusAktif || undefined}
             onChange={(v) => setFilter((f) => ({ ...f, statusAktif: v || "" }))}
             options={[{ value: "true", label: "Aktif" }, { value: "false", label: "Nonaktif" }]}

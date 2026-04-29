@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Card, Table, Tag, Input, Select, Button, Space, App } from "antd";
+import { Card, Table, Tag, Input, Select, Button, Space, App, Grid } from "antd";
 import { PlusOutlined, EyeOutlined, EditOutlined, DownloadOutlined, ReloadOutlined } from "@ant-design/icons";
 
 import PageHeader from "../components/layout/PageHeader";
@@ -8,6 +8,9 @@ import * as sppgApi from "../api/sppg.api";
 import { useAuthStore } from "../store/authStore";
 
 export default function SppgListPage() {
+  const screens = Grid.useBreakpoint();
+  const isMobile = !screens.md;
+  const filterControlStyle = (desktopWidth) => ({ width: isMobile ? "100%" : desktopWidth, maxWidth: "100%" });
   const navigate = useNavigate();
   const { hasRole } = useAuthStore();
   const { message } = App.useApp();
@@ -128,11 +131,11 @@ export default function SppgListPage() {
         }
       />
       <Card style={{ marginBottom: 16 }}>
-        <Space wrap>
+        <Space wrap style={{ width: "100%" }}>
           <Input.Search
             placeholder="Cari nama / kode / kab"
             allowClear
-            style={{ width: 260 }}
+            style={filterControlStyle(260)}
             onSearch={(v) => {
               setFilter((f) => ({ ...f, search: v }));
               fetchData({ page: 1 });
@@ -141,7 +144,7 @@ export default function SppgListPage() {
           <Select
             placeholder="Provinsi"
             allowClear
-            style={{ minWidth: 200 }}
+            style={filterControlStyle(220)}
             value={filter.provinsi || undefined}
             onChange={(v) => setFilter((f) => ({ ...f, provinsi: v || "" }))}
             options={provList.map((p) => ({ value: p.provinsi, label: `${p.provinsi} (${p.jumlah})` }))}
@@ -149,7 +152,7 @@ export default function SppgListPage() {
           <Select
             placeholder="Status"
             allowClear
-            style={{ minWidth: 140 }}
+            style={filterControlStyle(160)}
             value={filter.statusAktif || undefined}
             onChange={(v) => setFilter((f) => ({ ...f, statusAktif: v || "" }))}
             options={[
