@@ -85,14 +85,14 @@ body {
 }
 
 .auth-brand-logo {
-  width: min(100%, 420px);
+  width: min(100%, 520px);
   height: auto;
   object-fit: contain;
   margin-bottom: 8px;
 }
 
 .auth-card-logo {
-  width: min(100%, 240px);
+  width: min(100%, 112px);
   height: auto;
   object-fit: contain;
   margin-bottom: 16px;
@@ -118,12 +118,12 @@ body {
   }
 
   .auth-brand-logo {
-    width: min(100%, 280px);
+    width: min(100%, 320px);
     margin-bottom: 0;
   }
 
   .auth-card-logo {
-    width: min(100%, 180px);
+    width: min(100%, 96px);
     margin-inline: auto;
     display: block;
   }
