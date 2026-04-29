@@ -45,7 +45,15 @@ async function fetchText(url) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 25000);
   try {
-    const response = await fetch(url, { method: "GET", signal: controller.signal });
+    const response = await fetch(url, {
+      method: "GET",
+      signal: controller.signal,
+      // Beberapa situs memblokir request tanpa user-agent yang "wajar".
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; SIPGN-BGN Bot/1.0)",
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      },
+    });
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
@@ -365,14 +373,24 @@ async function runBgnScrapeSync(options = {}) {
   const run = async () => {
     const generatedAt = new Date();
     const sppgUrl = "https://www.bgn.go.id/operasional-sppg";
-    const domainUrl = "https://www.merahputihbgn.cloud/data-bgn/domains-mbg";
+    // Pastikan path sesuai link tree dari halaman root.
+    // Jika pakai path yang salah, situs akan balas 404 dan sync gagal.
+    const domainUrl =
+      "https://www.merahputihbgn.cloud/data-utama/bgn-sppg/data-bgn/domains-mbg";
     const rootUrl = "https://www.merahputihbgn.cloud/";
 
     const sppgHtml = await fetchText(sppgUrl);
     const parsedSppg = parseSppgOperasional(sppgHtml);
 
-    const domainHtml = await fetchText(domainUrl);
-    const rootHtml = await fetchText(rootUrl);
+    // Domain tree: kalau pun domainUrl gagal, minimal rootUrl tetap dicoba.
+    // (Tapi dengan path yang benar, domainUrl harusnya sukses.)
+    const [domainHtml, rootHtml] = await Promise.all([
+      fetchText(domainUrl).catch((e) => {
+        if (String(e && e.message).includes("HTTP 404")) return "";
+        throw e;
+      }),
+      fetchText(rootUrl),
+    ]);
     const domainLinks = [
       ...parseDomainLinks(domainHtml, domainUrl),
       ...parseDomainLinks(rootHtml, rootUrl),
