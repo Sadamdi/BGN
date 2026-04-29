@@ -8,6 +8,7 @@ import {
   Badge,
   Button,
   Tag,
+  Grid,
   theme as antdTheme,
 } from "antd";
 import {
@@ -75,6 +76,8 @@ function buildMenu(peran) {
 }
 
 export default function MainLayout() {
+  const screens = Grid.useBreakpoint();
+  const isMobile = !screens.lg;
   const [collapsed, setCollapsed] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const location = useLocation();
@@ -84,7 +87,12 @@ export default function MainLayout() {
   useNotifikasi();
 
   useEffect(() => {
-    if (window.innerWidth < 992) setCollapsed(true);
+    const syncCollapsed = () => {
+      setCollapsed(window.innerWidth < 992);
+    };
+    syncCollapsed();
+    window.addEventListener("resize", syncCollapsed);
+    return () => window.removeEventListener("resize", syncCollapsed);
   }, []);
 
   const items = useMemo(() => buildMenu((user && user.peran) || ""), [user]);
@@ -133,7 +141,7 @@ export default function MainLayout() {
       <Layout>
         <Header
           style={{
-            padding: "0 16px",
+            padding: isMobile ? "0 10px" : "0 16px",
             background: "#fff",
             display: "flex",
             alignItems: "center",
@@ -147,7 +155,7 @@ export default function MainLayout() {
             icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
             onClick={() => setCollapsed(!collapsed)}
           />
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 8 : 12 }}>
             <Badge count={jumlahBelum} overflowCount={99}>
               <Button shape="circle" icon={<BellOutlined />} onClick={() => setDrawerOpen(true)} />
             </Badge>
@@ -156,17 +164,19 @@ export default function MainLayout() {
                 <Avatar style={{ backgroundColor: "#1B3A6B" }}>
                   {user && user.namaLengkap ? user.namaLengkap.charAt(0) : "U"}
                 </Avatar>
-                <div style={{ lineHeight: 1.2 }}>
-                  <div style={{ fontWeight: 600 }}>{user && user.namaLengkap}</div>
-                  <Tag color={PERAN_COLOR[peran]} style={{ marginRight: 0 }}>
-                    {PERAN_LABEL[peran] || peran}
-                  </Tag>
-                </div>
+                {!isMobile ? (
+                  <div style={{ lineHeight: 1.2 }}>
+                    <div style={{ fontWeight: 600 }}>{user && user.namaLengkap}</div>
+                    <Tag color={PERAN_COLOR[peran]} style={{ marginRight: 0 }}>
+                      {PERAN_LABEL[peran] || peran}
+                    </Tag>
+                  </div>
+                ) : null}
               </div>
             </Dropdown>
           </div>
         </Header>
-        <Content style={{ padding: 24, background: "#F3F6FB" }}>
+        <Content style={{ padding: isMobile ? 12 : 24, background: "#F3F6FB" }}>
           <Outlet />
         </Content>
         <Footer style={{ textAlign: "center", color: "#475569" }}>
