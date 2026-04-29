@@ -134,7 +134,7 @@ export default function DistribusiListPage() {
         title="Distribusi MBG"
         actions={
           <Space>
-            {hasRole("ADMIN", "PEJABAT_BGN") ? (
+            {hasRole("ADMIN", "PEJABAT_BGN", "PENGAWAS_GIZI") ? (
               <Button icon={<SyncOutlined />} loading={syncLoading} onClick={onSyncScrape}>
                 Sinkron Data
               </Button>

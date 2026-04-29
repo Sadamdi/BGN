@@ -208,7 +208,7 @@ export default function DashboardPage() {
         }
         actions={
           <Space>
-            {hasRole("ADMIN", "PEJABAT_BGN") ? (
+            {hasRole("ADMIN", "PEJABAT_BGN", "PENGAWAS_GIZI") ? (
               <Button icon={<SyncOutlined />} onClick={onSyncScrape} loading={syncLoading}>
                 Sinkron Data
               </Button>
