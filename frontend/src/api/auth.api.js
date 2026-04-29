@@ -27,3 +27,7 @@ export function verifyResetOtp(token, otp) {
 export function ubahPassword(payload) {
   return api.post("/auth/ubah-password", payload).then((r) => r.data);
 }
+
+export function updatePreferences(payload) {
+  return api.patch("/auth/me/preferences", payload).then((r) => r.data);
+}
