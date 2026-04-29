@@ -15,6 +15,7 @@ import {
   Space,
   Grid,
   theme as antdTheme,
+  Tooltip,
 } from "antd";
 import {
   TeamOutlined,
@@ -332,7 +333,7 @@ export default function DashboardPage() {
                         {`Total: ${totalKategori}`}
                       </text>
                       <RTooltip />
-                      <Legend />
+                      <Legend formatter={(value) => (String(value).length > 20 ? `${String(value).slice(0, 20)}...` : value)} />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
@@ -381,8 +382,8 @@ export default function DashboardPage() {
                           }}
                         >
                           <Popup>
-                            <div style={{ minWidth: 180 }}>
-                              <div style={{ fontWeight: 700 }}>{s.namaSppg}</div>
+                            <div style={{ minWidth: 180, maxWidth: 240 }} className="text-wrap-anywhere">
+                              <div style={{ fontWeight: 700 }} className="text-wrap-anywhere">{s.namaSppg}</div>
                               <div>Provinsi: {s.provinsi}</div>
                               <div>Kapasitas: {s.kapasitas} porsi/hari</div>
                               <div>Distribusi kemarin: {s.distribusiKemarin}</div>
@@ -405,8 +406,12 @@ export default function DashboardPage() {
                       dataSource={alert.sppgBelumLapor.slice(0, 5)}
                       renderItem={(s) => (
                         <List.Item style={{ background: token.colorWarningBg, borderRadius: 6, padding: 8 }}>
-                          <span>{s.namaSppg}</span>
-                          <Tag color="orange">{s.provinsi}</Tag>
+                          <div className="dashboard-split-row">
+                            <Tooltip title={s.namaSppg}>
+                              <span className="left text-clamp-1">{s.namaSppg}</span>
+                            </Tooltip>
+                            <Tag color="orange" className="right">{s.provinsi}</Tag>
+                          </div>
                         </List.Item>
                       )}
                     />
@@ -421,11 +426,17 @@ export default function DashboardPage() {
                       dataSource={alert.penerimaGiziBermasalah.slice(0, 5)}
                       renderItem={(g) => (
                         <List.Item style={{ background: token.colorErrorBg, borderRadius: 6, padding: 8 }}>
-                          <div>
-                            <div style={{ fontWeight: 600 }}>{g.nama}</div>
-                            <div style={{ fontSize: 11, color: token.colorTextSecondary }}>{g.sppg}</div>
+                          <div className="dashboard-split-row">
+                            <div className="left">
+                              <Tooltip title={g.nama}>
+                                <div style={{ fontWeight: 600 }} className="text-clamp-1">{g.nama}</div>
+                              </Tooltip>
+                              <Tooltip title={g.sppg}>
+                                <div style={{ fontSize: 11, color: token.colorTextSecondary }} className="text-clamp-1">{g.sppg}</div>
+                              </Tooltip>
+                            </div>
+                            <Tag color={g.statusGizi === "GIZI_BURUK" ? "red" : "gold"} className="right">{g.statusGizi}</Tag>
                           </div>
-                          <Tag color={g.statusGizi === "GIZI_BURUK" ? "red" : "gold"}>{g.statusGizi}</Tag>
                         </List.Item>
                       )}
                     />
@@ -450,17 +461,21 @@ export default function DashboardPage() {
                     dataSource={indikatorPublik.slice(0, 12)}
                     renderItem={(item) => (
                       <List.Item>
-                        <Space style={{ width: "100%", justifyContent: "space-between" }}>
-                          <div>
-                            <strong>{item.indikator}</strong> - {item.namaWilayah}
-                            <div style={{ fontSize: 12, color: token.colorTextSecondary }}>
+                        <div className="dashboard-split-row">
+                          <div className="left">
+                            <Tooltip title={`${item.indikator} - ${item.namaWilayah}`}>
+                              <div className="text-clamp-2">
+                                <strong>{item.indikator}</strong> - {item.namaWilayah}
+                              </div>
+                            </Tooltip>
+                            <div style={{ fontSize: 12, color: token.colorTextSecondary }} className="text-wrap-anywhere">
                               {item.kategori} | {item.levelWilayah} | {item.tahun} | sumber: {item.sumber?.nama || "-"}
                             </div>
                           </div>
-                          <Tag color="blue">
+                          <Tag color="blue" className="right">
                             {Number(item.nilai).toLocaleString("id-ID")} {item.satuan || ""}
                           </Tag>
-                        </Space>
+                        </div>
                       </List.Item>
                     )}
                   />
