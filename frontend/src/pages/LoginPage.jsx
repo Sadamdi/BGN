@@ -6,6 +6,7 @@ import { useAuthStore } from "../store/authStore";
 import * as authApi from "../api/auth.api";
 import logoIcon from "../Media/Logo.png";
 import brandBanner from "../Media/Banner Logo.png";
+import ThemeToggleButton from "../components/theme/ThemeToggleButton";
 
 const { Title, Text } = Typography;
 
@@ -70,6 +71,9 @@ export default function LoginPage() {
 
   return (
     <div className="auth-screen">
+      <div className="auth-theme-toggle">
+        <ThemeToggleButton />
+      </div>
       <div
         style={{
           flex: 1,

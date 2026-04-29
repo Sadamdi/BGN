@@ -1,5 +1,5 @@
 import React from "react";
-import { Drawer, List, Tag, Button, Empty, Typography, theme as antdTheme } from "antd";
+import { Drawer, List, Tag, Button, Empty, Typography, Tooltip, theme as antdTheme } from "antd";
 import dayjs from "dayjs";
 import { useNotifikasiStore } from "../../store/notifikasiStore";
 import * as notifApi from "../../api/notifikasi.api";
@@ -47,14 +47,20 @@ export default function NotificationDrawer({ open, onClose }) {
               <List.Item style={{ background: n.dibaca ? "transparent" : token.colorFillAlter, borderRadius: 8, padding: 12 }}>
                 <List.Item.Meta
                   title={
-                    <span>
+                    <span className="text-wrap-anywhere">
                       <Tag color={meta.color}>{meta.label}</Tag>
-                      <Typography.Text strong>{n.judul}</Typography.Text>
+                      <Tooltip title={n.judul}>
+                        <Typography.Text strong className="text-clamp-1" style={{ display: "inline-block", maxWidth: "86%" }}>
+                          {n.judul}
+                        </Typography.Text>
+                      </Tooltip>
                     </span>
                   }
                   description={
                     <>
-                      <div>{n.pesan}</div>
+                      <Tooltip title={n.pesan}>
+                        <div className="text-clamp-2 text-wrap-anywhere">{n.pesan}</div>
+                      </Tooltip>
                       <div style={{ fontSize: 11, color: token.colorTextSecondary, marginTop: 4 }}>
                         {dayjs(n.createdAt).format("DD MMM YYYY HH:mm")}
                       </div>
