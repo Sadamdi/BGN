@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Form, Input, Button, Checkbox, Modal, Alert, Typography, Card, App } from "antd";
+import { Form, Input, Button, Checkbox, Modal, Alert, Typography, Card, App, theme as antdTheme } from "antd";
 import { UserOutlined, LockOutlined, MailOutlined } from "@ant-design/icons";
 import { useAuthStore } from "../store/authStore";
 import * as authApi from "../api/auth.api";
@@ -10,6 +10,7 @@ import brandBanner from "../Media/Banner Logo.png";
 const { Title, Text } = Typography;
 
 export default function LoginPage() {
+  const { token } = antdTheme.useToken();
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -80,22 +81,22 @@ export default function LoginPage() {
         }}
         className="bgn-login-side"
       >
-        <div style={{ color: "#0f172a", maxWidth: 520 }} className="auth-brand-panel">
+        <div style={{ color: token.colorText, maxWidth: 520 }} className="auth-brand-panel">
           <img
             src={brandBanner}
             alt="Banner Badan Gizi Nasional"
             className="auth-brand-logo"
           />
-          <Title level={2} style={{ color: "#0f172a", marginBottom: 4 }}>
+          <Title level={2} style={{ color: token.colorText, marginBottom: 4 }}>
             SIPGN-BGN
           </Title>
-          <Title level={4} style={{ color: "#1e293b", marginTop: 0 }}>
+          <Title level={4} style={{ color: token.colorTextHeading, marginTop: 0 }}>
             Sistem Informasi Pemenuhan Gizi Nasional
           </Title>
-          <Text style={{ color: "#334155" }}>
+          <Text type="secondary">
             Badan Gizi Nasional — Program Makan Bergizi Gratis
           </Text>
-          <p style={{ color: "#475569", marginTop: 24, fontSize: 14, lineHeight: 1.7 }}>
+          <p style={{ color: token.colorTextSecondary, marginTop: 24, fontSize: 14, lineHeight: 1.7 }}>
             Pantau distribusi MBG, kelola data penerima manfaat, dan analisis status gizi
             di seluruh SPPG Indonesia secara terpadu.
           </p>

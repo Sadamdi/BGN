@@ -10,6 +10,7 @@ import {
   Tag,
   Grid,
   Skeleton,
+  Select,
   theme as antdTheme,
 } from "antd";
 import {
@@ -34,6 +35,7 @@ import * as authApi from "../../api/auth.api";
 import NotificationDrawer from "./NotificationDrawer";
 import logoIcon from "../../Media/Logo.png";
 import brandBanner from "../../Media/Banner Logo.png";
+import { useThemeStore, THEME_MODE } from "../../store/themeStore";
 
 const { Sider, Header, Content, Footer } = Layout;
 
@@ -79,6 +81,7 @@ function buildMenu(peran) {
 }
 
 export default function MainLayout() {
+  const { token } = antdTheme.useToken();
   const screens = Grid.useBreakpoint();
   const isMobile = !screens.lg;
   const [collapsed, setCollapsed] = useState(false);
@@ -86,7 +89,9 @@ export default function MainLayout() {
   const [contentLoading, setContentLoading] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, clearSession } = useAuthStore();
+  const { user, clearSession, setUser } = useAuthStore();
+  const themeMode = useThemeStore((s) => s.themeMode);
+  const applyThemeMode = useThemeStore((s) => s.applyThemeMode);
   const jumlahBelum = useNotifikasiStore((s) => s.jumlahBelumDibaca);
   useNotifikasi();
 
@@ -115,9 +120,33 @@ export default function MainLayout() {
     navigate("/login");
   };
 
+  const onChangeTheme = async (nextMode) => {
+    applyThemeMode(nextMode);
+    if (!user) return;
+    try {
+      await authApi.updatePreferences({ themePreference: nextMode });
+      setUser({ ...user, themePreference: nextMode });
+    } catch (_) {}
+  };
+
   const profileMenu = {
     items: [
       { key: "profil", label: <Link to="/profil">Profil saya</Link>, icon: <UserOutlined /> },
+      {
+        key: "theme-light",
+        label: "Tema: Light",
+        onClick: () => onChangeTheme(THEME_MODE.LIGHT),
+      },
+      {
+        key: "theme-dark",
+        label: "Tema: Dark",
+        onClick: () => onChangeTheme(THEME_MODE.DARK),
+      },
+      {
+        key: "theme-system",
+        label: "Tema: System",
+        onClick: () => onChangeTheme(THEME_MODE.SYSTEM),
+      },
       { type: "divider" },
       { key: "logout", label: "Keluar", icon: <LogoutOutlined />, onClick: onLogout },
     ],
@@ -130,7 +159,7 @@ export default function MainLayout() {
       <Sider collapsible collapsed={collapsed} onCollapse={setCollapsed} breakpoint="lg" trigger={null} width={236}>
         <div
           style={{
-            color: "#fff",
+            color: token.colorTextLightSolid,
             fontWeight: 800,
             letterSpacing: 1,
             padding: collapsed ? "20px 8px" : "20px 16px",
@@ -161,11 +190,11 @@ export default function MainLayout() {
         <Header
           style={{
             padding: isMobile ? "0 10px" : "0 16px",
-            background: "#fff",
+            background: token.colorBgContainer,
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            borderBottom: "1px solid #e2e8f0",
+            borderBottom: `1px solid ${token.colorBorderSecondary}`,
             boxShadow: "0 4px 14px rgba(15, 23, 42, 0.04)",
           }}
         >
@@ -175,12 +204,25 @@ export default function MainLayout() {
             onClick={() => setCollapsed(!collapsed)}
           />
           <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 8 : 12 }}>
+            {!isMobile ? (
+              <Select
+                size="small"
+                value={themeMode}
+                style={{ width: 120 }}
+                onChange={onChangeTheme}
+                options={[
+                  { value: THEME_MODE.LIGHT, label: "Light" },
+                  { value: THEME_MODE.DARK, label: "Dark" },
+                  { value: THEME_MODE.SYSTEM, label: "System" },
+                ]}
+              />
+            ) : null}
             <Badge count={jumlahBelum} overflowCount={99}>
               <Button shape="circle" icon={<BellOutlined />} onClick={() => setDrawerOpen(true)} />
             </Badge>
             <Dropdown menu={profileMenu} trigger={["click"]}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-                <Avatar style={{ backgroundColor: "#1B3A6B" }}>
+                <Avatar style={{ backgroundColor: token.colorPrimary }}>
                   {user && user.namaLengkap ? user.namaLengkap.charAt(0) : "U"}
                 </Avatar>
                 {!isMobile ? (
@@ -195,7 +237,7 @@ export default function MainLayout() {
             </Dropdown>
           </div>
         </Header>
-        <Content style={{ padding: isMobile ? 12 : 24, background: "#F3F6FB" }}>
+        <Content style={{ padding: isMobile ? 12 : 24, background: token.colorBgLayout }}>
           <div key={location.pathname} className="route-fade-enter">
             {contentLoading ? (
               <div className="page-transition-shell">
@@ -206,7 +248,7 @@ export default function MainLayout() {
             )}
           </div>
         </Content>
-        <Footer style={{ textAlign: "center", color: "#475569" }}>
+        <Footer style={{ textAlign: "center", color: token.colorTextSecondary }}>
           SIPGN-BGN © {new Date().getFullYear()} Badan Gizi Nasional — Sistem Informasi Pemenuhan Gizi Nasional
           <span style={{ marginLeft: 8, fontSize: 11 }}>v{import.meta.env.VITE_APP_VERSION || "1.0.0"}</span>
         </Footer>

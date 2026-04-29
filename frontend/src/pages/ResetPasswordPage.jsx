@@ -1,12 +1,13 @@
 import React, { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Form, Input, Button, Card, Typography, Alert, App, Space } from "antd";
+import { Form, Input, Button, Card, Typography, Alert, App, Space, theme as antdTheme } from "antd";
 import * as authApi from "../api/auth.api";
 import logoIcon from "../Media/Logo.png";
 
 const { Title } = Typography;
 
 export default function ResetPasswordPage() {
+  const { token: themeToken } = antdTheme.useToken();
   const [form] = Form.useForm();
   const { token } = useParams();
   const [loading, setLoading] = useState(false);
@@ -74,7 +75,7 @@ export default function ResetPasswordPage() {
           </Form.Item>
           <Space wrap style={{ marginBottom: 12 }}>
             <Button onClick={onVerifyOtp} loading={verifyingOtp}>Verifikasi OTP</Button>
-            {otpValid ? <span style={{ color: "#16a34a" }}>OTP tervalidasi</span> : null}
+            {otpValid ? <span style={{ color: themeToken.colorSuccess }}>OTP tervalidasi</span> : null}
           </Space>
           <Form.Item name="password" label="Password baru" rules={[{ required: true, min: 8, message: "Minimal 8 karakter" }]}>
             <Input.Password />

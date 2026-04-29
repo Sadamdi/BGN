@@ -15,6 +15,11 @@ const LOCKOUT_TTL = 15 * 60;
 const MAX_FAIL = 5;
 const RESET_TTL = 30 * 60;
 const RESET_MAX_OTP_ATTEMPTS = 5;
+const THEME_MODES = ["LIGHT", "DARK", "SYSTEM"];
+
+function getThemeKey(userId) {
+  return `pref:theme:${userId}`;
+}
 
 function publicUser(u) {
   return {
@@ -25,7 +30,29 @@ function publicUser(u) {
     peran: u.peran,
     sppgId: u.sppgId,
     wilayahZona: u.wilayahZona,
+    themePreference: THEME_MODES.includes(u.themePreference) ? u.themePreference : "SYSTEM",
   };
+}
+
+async function getThemePreference(userId) {
+  if (!userId) return "SYSTEM";
+  try {
+    const pref = await getRedis().get(getThemeKey(userId));
+    return THEME_MODES.includes(pref) ? pref : "SYSTEM";
+  } catch (_) {
+    return "SYSTEM";
+  }
+}
+
+async function setThemePreference(userId, themePreference) {
+  const next = String(themePreference || "").toUpperCase();
+  if (!THEME_MODES.includes(next)) {
+    throw new HttpError(422, "themePreference harus LIGHT, DARK, atau SYSTEM", "VALIDATION_ERROR");
+  }
+  try {
+    await getRedis().set(getThemeKey(userId), next);
+  } catch (_) {}
+  return next;
 }
 
 function buildAccessToken(u) {
@@ -126,10 +153,11 @@ async function login({ identifier, password }) {
     data: { terakhirLogin: new Date() },
   });
 
+  const themePreference = await getThemePreference(user.id);
   return {
     accessToken,
     refreshToken,
-    user: publicUser(user),
+    user: publicUser({ ...user, themePreference }),
   };
 }
 
@@ -150,7 +178,8 @@ async function refreshAccessToken(refreshToken) {
     throw new HttpError(401, "Akun tidak aktif", "ACCOUNT_DISABLED");
   }
   const accessToken = buildAccessToken(user);
-  return { accessToken, user: publicUser(user) };
+  const themePreference = await getThemePreference(user.id);
+  return { accessToken, user: publicUser({ ...user, themePreference }) };
 }
 
 async function logout({ userId, accessToken, accessTokenExp }) {
@@ -269,6 +298,9 @@ module.exports = {
   verifyResetOtp,
   resetPassword,
   ubahPassword,
+  getThemePreference,
+  setThemePreference,
+  THEME_MODES,
   publicUser,
   buildAccessToken,
   buildRefreshToken,

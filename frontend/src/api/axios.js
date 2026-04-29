@@ -26,9 +26,10 @@ async function doRefresh() {
   if (!refreshToken) throw new Error("NO_REFRESH");
   const r = await axios.post(`${baseURL}/auth/refresh`, { refreshToken });
   const newAccess = r.data && r.data.data && r.data.data.accessToken;
+  const refreshedUser = r.data && r.data.data && r.data.data.user;
   if (!newAccess) throw new Error("NO_NEW_TOKEN");
   useAuthStore.getState().setSession({
-    user: useAuthStore.getState().user,
+    user: refreshedUser || useAuthStore.getState().user,
     accessToken: newAccess,
     refreshToken,
   });

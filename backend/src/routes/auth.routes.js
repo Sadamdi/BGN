@@ -16,5 +16,6 @@ router.post("/reset-password/:token/verify-otp", ctrl.postVerifyResetOtp);
 router.post("/reset-password/:token", ctrl.postResetPassword);
 router.post("/ubah-password", verifyToken, ctrl.postUbahPassword);
 router.get("/me", verifyToken, ctrl.getMe);
+router.patch("/me/preferences", verifyToken, ctrl.patchMePreferences);
 
 module.exports = router;

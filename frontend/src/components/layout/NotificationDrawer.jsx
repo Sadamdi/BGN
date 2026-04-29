@@ -1,5 +1,5 @@
 import React from "react";
-import { Drawer, List, Tag, Button, Empty, Typography } from "antd";
+import { Drawer, List, Tag, Button, Empty, Typography, theme as antdTheme } from "antd";
 import dayjs from "dayjs";
 import { useNotifikasiStore } from "../../store/notifikasiStore";
 import * as notifApi from "../../api/notifikasi.api";
@@ -12,6 +12,7 @@ const JENIS_LABEL = {
 };
 
 export default function NotificationDrawer({ open, onClose }) {
+  const { token } = antdTheme.useToken();
   const items = useNotifikasiStore((s) => s.items);
   const tandaiSemuaDibaca = useNotifikasiStore((s) => s.tandaiSemuaDibaca);
 
@@ -43,7 +44,7 @@ export default function NotificationDrawer({ open, onClose }) {
           renderItem={(n) => {
             const meta = JENIS_LABEL[n.jenis] || { label: "Info", color: "default" };
             return (
-              <List.Item style={{ background: n.dibaca ? "transparent" : "#F0F4FF", borderRadius: 8, padding: 12 }}>
+              <List.Item style={{ background: n.dibaca ? "transparent" : token.colorFillAlter, borderRadius: 8, padding: 12 }}>
                 <List.Item.Meta
                   title={
                     <span>
@@ -54,7 +55,7 @@ export default function NotificationDrawer({ open, onClose }) {
                   description={
                     <>
                       <div>{n.pesan}</div>
-                      <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
+                      <div style={{ fontSize: 11, color: token.colorTextSecondary, marginTop: 4 }}>
                         {dayjs(n.createdAt).format("DD MMM YYYY HH:mm")}
                       </div>
                     </>
