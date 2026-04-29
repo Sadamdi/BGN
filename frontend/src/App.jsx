@@ -1,5 +1,5 @@
 import React from "react";
-import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 
 import ProtectedRoute from "./components/common/ProtectedRoute.jsx";
 import MainLayout from "./components/layout/MainLayout.jsx";
@@ -23,9 +23,8 @@ import NotFoundPage from "./pages/NotFoundPage.jsx";
 import ResetPasswordPage from "./pages/ResetPasswordPage.jsx";
 
 export default function App() {
-  const location = useLocation();
   return (
-    <div key={location.pathname} className="route-fade-enter">
+    <div>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/reset-password/:token" element={<ResetPasswordPage />} />

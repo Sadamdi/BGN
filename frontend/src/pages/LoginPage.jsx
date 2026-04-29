@@ -4,6 +4,7 @@ import { Form, Input, Button, Checkbox, Modal, Alert, Typography, Card, App } fr
 import { UserOutlined, LockOutlined, MailOutlined } from "@ant-design/icons";
 import { useAuthStore } from "../store/authStore";
 import * as authApi from "../api/auth.api";
+import brandLogo from "../Media/image.png";
 
 const { Title, Text } = Typography;
 
@@ -78,7 +79,12 @@ export default function LoginPage() {
         }}
         className="bgn-login-side"
       >
-        <div style={{ color: "#0f172a", maxWidth: 460 }}>
+        <div style={{ color: "#0f172a", maxWidth: 520 }} className="auth-brand-panel">
+          <img
+            src={brandLogo}
+            alt="Logo Badan Gizi Nasional"
+            className="auth-brand-logo"
+          />
           <Title level={2} style={{ color: "#0f172a", marginBottom: 4 }}>
             SIPGN-BGN
           </Title>
@@ -107,6 +113,11 @@ export default function LoginPage() {
         }}
       >
         <Card className="auth-card" style={{ width: "100%", maxWidth: 410 }}>
+          <img
+            src={brandLogo}
+            alt="Logo Badan Gizi Nasional"
+            className="auth-card-logo"
+          />
           <Title level={3} style={{ marginBottom: 4 }}>
             Selamat datang
           </Title>

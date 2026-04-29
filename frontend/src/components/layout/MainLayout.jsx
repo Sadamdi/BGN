@@ -9,6 +9,7 @@ import {
   Button,
   Tag,
   Grid,
+  Skeleton,
   theme as antdTheme,
 } from "antd";
 import {
@@ -31,6 +32,7 @@ import { useNotifikasiStore } from "../../store/notifikasiStore";
 import useNotifikasi from "../../hooks/useNotifikasi";
 import * as authApi from "../../api/auth.api";
 import NotificationDrawer from "./NotificationDrawer";
+import brandLogo from "../../Media/image.png";
 
 const { Sider, Header, Content, Footer } = Layout;
 
@@ -80,6 +82,7 @@ export default function MainLayout() {
   const isMobile = !screens.lg;
   const [collapsed, setCollapsed] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [contentLoading, setContentLoading] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { user, clearSession } = useAuthStore();
@@ -94,6 +97,12 @@ export default function MainLayout() {
     window.addEventListener("resize", syncCollapsed);
     return () => window.removeEventListener("resize", syncCollapsed);
   }, []);
+
+  useEffect(() => {
+    setContentLoading(true);
+    const timer = window.setTimeout(() => setContentLoading(false), 180);
+    return () => window.clearTimeout(timer);
+  }, [location.pathname]);
 
   const items = useMemo(() => buildMenu((user && user.peran) || ""), [user]);
 
@@ -129,12 +138,23 @@ export default function MainLayout() {
             borderBottom: "1px solid #1f2937",
           }}
         >
-          {collapsed ? "BGN" : "SIPGN-BGN"}
-          {!collapsed ? (
-            <div style={{ fontSize: 11, fontWeight: 400, color: "#cbd5e1", marginTop: 2 }}>
-              Pemenuhan Gizi Nasional
+          {collapsed ? (
+            "BGN"
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <img
+                src={brandLogo}
+                alt="Logo Badan Gizi Nasional"
+                style={{ width: 42, height: 42, objectFit: "contain", flexShrink: 0 }}
+              />
+              <div>
+                <div>SIPGN-BGN</div>
+                <div style={{ fontSize: 11, fontWeight: 400, color: "#cbd5e1", marginTop: 2 }}>
+                  Pemenuhan Gizi Nasional
+                </div>
+              </div>
             </div>
-          ) : null}
+          )}
         </div>
         <Menu theme="dark" mode="inline" selectedKeys={[location.pathname]} items={items} />
       </Sider>
@@ -177,7 +197,15 @@ export default function MainLayout() {
           </div>
         </Header>
         <Content style={{ padding: isMobile ? 12 : 24, background: "#F3F6FB" }}>
-          <Outlet />
+          <div key={location.pathname} className="route-fade-enter">
+            {contentLoading ? (
+              <div className="page-transition-shell">
+                <Skeleton active paragraph={{ rows: isMobile ? 6 : 8 }} title={{ width: "38%" }} />
+              </div>
+            ) : (
+              <Outlet />
+            )}
+          </div>
         </Content>
         <Footer style={{ textAlign: "center", color: "#475569" }}>
           SIPGN-BGN © {new Date().getFullYear()} Badan Gizi Nasional — Sistem Informasi Pemenuhan Gizi Nasional
