@@ -5,7 +5,12 @@ import { useAuthStore } from "../store/authStore";
 import { useNotifikasiStore } from "../store/notifikasiStore";
 import * as notifApi from "../api/notifikasi.api";
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || (import.meta.env.DEV ? "http://localhost:3000" : window.location.origin);
+function resolveSocketUrl() {
+  const raw = import.meta.env.VITE_SOCKET_URL || (import.meta.env.DEV ? "http://localhost:3000" : window.location.origin);
+  return String(raw).replace(/\/+$/, "").replace(/\/frontend$/i, "").replace(/\/api$/i, "");
+}
+
+const SOCKET_URL = resolveSocketUrl();
 
 export default function useNotifikasi() {
   const { isAuthenticated, accessToken } = useAuthStore();
@@ -29,7 +34,10 @@ export default function useNotifikasi() {
     if (!isAuthenticated || !accessToken) return;
     const s = io(SOCKET_URL, {
       auth: { token: accessToken },
-      transports: ["websocket", "polling"],
+      path: "/socket.io",
+      transports: ["websocket"],
+      reconnection: false,
+      timeout: 8000,
     });
     sockRef.current = s;
 
@@ -41,6 +49,13 @@ export default function useNotifikasi() {
         placement: "topRight",
         duration: 6,
       });
+    });
+
+    s.on("connect_error", () => {
+      // Jangan spam reconnect/error di environment yang tidak support websocket.
+      try {
+        s.disconnect();
+      } catch (_) {}
     });
 
     return () => {
