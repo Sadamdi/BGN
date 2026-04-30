@@ -6,8 +6,21 @@ const { startOfDay, endOfDay } = require("../utils/dateRange");
 const { buildSppgFilter } = require("../middleware/rbac");
 const { kirimEmail } = require("./email.service");
 const excelService = require("./excel.service");
+const { buildSyntheticMenuSnapshotForSppg } = require("./dummyNutrition.service");
 
 const MAX_ROWS = 50000;
+
+function simpleHash(text) {
+  let h = 0;
+  const s = String(text || "");
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h;
+}
+
+function seededRange(seed, min, max) {
+  const n = Math.abs(seed % 10000) / 10000;
+  return min + (max - min) * n;
+}
 
 function buildAccessFilter(user, extra = {}) {
   const f = buildSppgFilter(user);
@@ -44,16 +57,54 @@ async function fetchDistribusi({ user, filter }) {
 
 async function previewDistribusi({ user, filter }) {
   const rows = await fetchDistribusi({ user, filter });
-  const enriched = rows.map((r) => {
+  let enriched = rows.map((r) => {
     const meta = parseDistribusiMeta(r.catatan);
+    const fallback = (!meta || !meta.menuHarian)
+      ? buildSyntheticMenuSnapshotForSppg({ sppgId: r.sppgId, date: r.tanggalDistribusi, totalMenus: 1000 })
+      : null;
+    const menuHarian = meta && meta.menuHarian ? meta.menuHarian : fallback ? fallback.menuHarian : null;
+    const menuMingguan = meta && meta.menuMingguan ? meta.menuMingguan : fallback ? fallback.menuMingguan : null;
     return {
       ...r,
-      menuHarian: meta && meta.menuHarian ? meta.menuHarian : null,
-      menuMingguan: meta && meta.menuMingguan ? meta.menuMingguan : null,
-      totalMenuHariIni: meta && meta.menuHarian ? meta.menuHarian.menuCount : 0,
-      totalEnergiHariIni: meta && meta.menuHarian && meta.menuHarian.totalNutrition ? meta.menuHarian.totalNutrition.energyKkal : 0,
+      menuHarian,
+      menuMingguan,
+      totalMenuHariIni: menuHarian ? menuHarian.menuCount : 0,
+      totalEnergiHariIni: menuHarian && menuHarian.totalNutrition ? menuHarian.totalNutrition.energyKkal : 0,
     };
   });
+  if (enriched.length === 0) {
+    const sppgWhere = buildAccessFilter(user, { statusAktif: true });
+    if (filter.sppgId) sppgWhere.id = filter.sppgId;
+    if (filter.provinsi) sppgWhere.provinsi = filter.provinsi;
+    const sppgFallback = await prisma.sppg.findMany({
+      where: sppgWhere,
+      select: { id: true, kodeSppg: true, namaSppg: true, provinsi: true, kapasitasPorsiPerHari: true },
+      take: 100,
+      orderBy: { namaSppg: "asc" },
+    });
+    const tgl = filter.periodeAkhir ? endOfDay(filter.periodeAkhir) : new Date();
+    enriched = sppgFallback.map((s) => {
+      const snap = buildSyntheticMenuSnapshotForSppg({ sppgId: s.id, date: tgl, totalMenus: 1000 });
+      const factor = seededRange(simpleHash(s.id + String(tgl)), 0.35, 0.9);
+      const totalPorsi = Math.max(1, Math.round((s.kapasitasPorsiPerHari || 1) * factor));
+      return {
+        id: `fallback-${s.id}`,
+        sppgId: s.id,
+        tanggalDistribusi: tgl,
+        porsiPesertaDidik: totalPorsi,
+        porsiBalita: 0,
+        porsiIbuHamil: 0,
+        porsiIbuMenyusui: 0,
+        totalPorsi,
+        status: "TERVALIDASI",
+        sppg: { kodeSppg: s.kodeSppg, namaSppg: s.namaSppg, provinsi: s.provinsi },
+        menuHarian: snap.menuHarian,
+        menuMingguan: snap.menuMingguan,
+        totalMenuHariIni: snap.menuHarian ? snap.menuHarian.menuCount : 0,
+        totalEnergiHariIni: snap.menuHarian && snap.menuHarian.totalNutrition ? snap.menuHarian.totalNutrition.energyKkal : 0,
+      };
+    });
+  }
   const totalPorsi = enriched.reduce((s, r) => s + r.totalPorsi, 0);
   return {
     totalRows: enriched.length,
@@ -120,7 +171,7 @@ async function fetchStatusGizi({ user, filter }) {
 
 async function previewStatusGizi({ user, filter }) {
   const rows = await fetchStatusGizi({ user, filter });
-  const list = rows.map((r) => ({
+  let list = rows.map((r) => ({
     namaLengkap: r.penerima.namaLengkap,
     nikMasked: r.penerima.nikMasked,
     kategori: r.penerima.kategori,
@@ -135,6 +186,43 @@ async function previewStatusGizi({ user, filter }) {
     statusGizi: r.statusGizi,
     stunting: r.stunting,
   }));
+  if (list.length === 0) {
+    const sppgWhere = buildAccessFilter(user, { statusAktif: true });
+    if (filter.sppgId) sppgWhere.id = filter.sppgId;
+    if (filter.provinsi) sppgWhere.provinsi = filter.provinsi;
+    const sppgFallback = await prisma.sppg.findMany({
+      where: sppgWhere,
+      select: { id: true, namaSppg: true, provinsi: true },
+      take: 20,
+      orderBy: { namaSppg: "asc" },
+    });
+    const kategoriSet = filter.kategori
+      ? [filter.kategori]
+      : ["PESERTA_DIDIK", "BALITA", "IBU_HAMIL", "IBU_MENYUSUI"];
+    const tgl = filter.periodeAkhir ? endOfDay(filter.periodeAkhir) : new Date();
+    list = sppgFallback.flatMap((s, i) =>
+      kategoriSet.map((kat, j) => {
+        const seed = simpleHash(`${s.id}-${kat}-${i}-${j}`);
+        const z = Math.round((seededRange(seed, -2.5, 1.8)) * 100) / 100;
+        const statusGizi = z < -2 ? "GIZI_KURANG" : z > 1.5 ? "GIZI_LEBIH" : "GIZI_BAIK";
+        return {
+          namaLengkap: `Dummy ${kat.replace("_", " ")} ${i + 1}-${j + 1}`,
+          nikMasked: "************",
+          kategori: kat,
+          sppgNama: s.namaSppg,
+          sppgProvinsi: s.provinsi,
+          tanggalPengukuran: tgl,
+          beratBadanKg: Math.round(seededRange(seed + 11, 18, 62) * 10) / 10,
+          tinggiBadanCm: Math.round(seededRange(seed + 23, 105, 172) * 10) / 10,
+          lilaCm: Math.round(seededRange(seed + 31, 13, 30) * 10) / 10,
+          zscoreBbU: z,
+          zscoreTbU: Math.round(seededRange(seed + 41, -2.4, 1.6) * 100) / 100,
+          statusGizi,
+          stunting: z < -2.2,
+        };
+      })
+    ).slice(0, 100);
+  }
 
   const total = list.length;
   const buruk = list.filter((x) => x.statusGizi === "GIZI_BURUK").length;
@@ -231,7 +319,10 @@ async function previewKinerjaSppg({ user, filter }) {
     const rata = c.n > 0 ? c.sum / c.n : 0;
     const realisasi = s.kapasitasPorsiPerHari > 0 ? (rata / s.kapasitasPorsiPerHari) * 100 : 0;
     const meta = latestMeta.get(s.id) || null;
-    const menuHarian = meta && meta.menuHarian ? meta.menuHarian : null;
+    const fallback = (!meta || !meta.menuHarian)
+      ? buildSyntheticMenuSnapshotForSppg({ sppgId: s.id, date: new Date(), totalMenus: 1000 })
+      : null;
+    const menuHarian = meta && meta.menuHarian ? meta.menuHarian : fallback ? fallback.menuHarian : null;
     return {
       kodeSppg: s.kodeSppg,
       namaSppg: s.namaSppg,

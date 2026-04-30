@@ -652,4 +652,24 @@ async function runDailyDummyNutrition(options = {}) {
   });
 }
 
-module.exports = { runDailyDummyNutrition };
+function buildSyntheticMenuSnapshotForSppg({ sppgId, date = new Date(), totalMenus = 1000 }) {
+  const safeTotalMenus = Math.max(1000, Math.min(10000, Number(totalMenus) || 1000));
+  const menuPool = buildMenuPool(safeTotalMenus);
+  const d = dayjs(date).tz(TZ);
+  const weekKey = d.startOf("week").format("YYYY-[W]WW");
+  const weekdayIdx = weekdayIndexFromDate(d.toDate());
+  const weekdayKey = WEEKDAY_KEYS[weekdayIdx];
+  const menuMingguan = buildWeeklyMenuPlanForSppg(sppgId, weekKey, menuPool);
+  const menuHarian = menuMingguan[weekdayKey] || null;
+  return {
+    source: "synthetic_fallback",
+    generatedAt: d.toDate(),
+    weekKey,
+    weekdayKey,
+    totalMenus: safeTotalMenus,
+    menuHarian,
+    menuMingguan,
+  };
+}
+
+module.exports = { runDailyDummyNutrition, buildSyntheticMenuSnapshotForSppg };

@@ -84,6 +84,11 @@ export default function LaporanPage() {
     }
   };
 
+  useEffect(() => {
+    onPreview();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jenis]);
+
   const onExportExcel = async () => {
     setLoading(true);
     try {
