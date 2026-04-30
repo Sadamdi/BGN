@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Card, Descriptions, Spin, Empty, Row, Col, Statistic, Tag, Space, Button } from "antd";
+import { Card, Descriptions, Spin, Empty, Row, Col, Statistic, Tag, Space, Button, List } from "antd";
 import { ArrowLeftOutlined } from "@ant-design/icons";
 import {
   ResponsiveContainer,
@@ -76,6 +76,59 @@ export default function SppgDetailPage() {
             </AreaChart>
           </ResponsiveContainer>
         </div>
+      </Card>
+
+      <Card style={{ marginTop: 16 }} title="Menu Harian & Nutrisi">
+        {data.statistik && data.statistik.menuHarian ? (
+          <Row gutter={[16, 16]}>
+            <Col xs={24} md={10}>
+              <Statistic title="Jumlah Menu Hari Ini" value={data.statistik.menuHarian.menuCount || 0} />
+              <Descriptions size="small" column={1} style={{ marginTop: 12 }}>
+                <Descriptions.Item label="Energi (kkal)">{data.statistik.menuHarian.totalNutrition?.energyKkal ?? 0}</Descriptions.Item>
+                <Descriptions.Item label="Protein (g)">{data.statistik.menuHarian.totalNutrition?.proteinG ?? 0}</Descriptions.Item>
+                <Descriptions.Item label="Lemak (g)">{data.statistik.menuHarian.totalNutrition?.fatG ?? 0}</Descriptions.Item>
+                <Descriptions.Item label="Karbohidrat (g)">{data.statistik.menuHarian.totalNutrition?.carbsG ?? 0}</Descriptions.Item>
+              </Descriptions>
+            </Col>
+            <Col xs={24} md={14}>
+              <List
+                size="small"
+                bordered
+                dataSource={data.statistik.menuHarian.menus || []}
+                renderItem={(item) => (
+                  <List.Item>
+                    <Space direction="vertical" size={0}>
+                      <b>{item.title || item.code}</b>
+                      <span style={{ opacity: 0.75 }}>Energi: {item.totalNutrition?.energyKkal ?? 0} kkal</span>
+                    </Space>
+                  </List.Item>
+                )}
+              />
+            </Col>
+          </Row>
+        ) : (
+          <Empty description="Belum ada detail menu harian" />
+        )}
+      </Card>
+
+      <Card style={{ marginTop: 16 }} title="Rencana Menu Mingguan (Senin-Minggu)">
+        {data.statistik && data.statistik.menuMingguan ? (
+          <Row gutter={[12, 12]}>
+            {Object.entries(data.statistik.menuMingguan).map(([hari, info]) => (
+              <Col key={hari} xs={24} md={12} lg={8}>
+                <Card size="small" title={hari.toUpperCase()}>
+                  <div style={{ marginBottom: 8 }}>Menu: {info.menuCount || 0}</div>
+                  <div style={{ marginBottom: 8 }}>Energi: {info.totalNutrition?.energyKkal ?? 0} kkal</div>
+                  <div style={{ fontSize: 12, opacity: 0.8 }}>
+                    {(info.menus || []).slice(0, 4).map((m) => m.title || m.code).join(", ")}
+                  </div>
+                </Card>
+              </Col>
+            ))}
+          </Row>
+        ) : (
+          <Empty description="Belum ada jadwal menu mingguan" />
+        )}
       </Card>
 
       <Card style={{ marginTop: 16 }} title="Detail">

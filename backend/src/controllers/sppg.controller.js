@@ -18,6 +18,15 @@ function applyAccessFilter(where, user) {
   return where;
 }
 
+function parseDistribusiCatatan(catatan) {
+  if (!catatan) return null;
+  try {
+    return typeof catatan === "string" ? JSON.parse(catatan) : catatan;
+  } catch (_) {
+    return null;
+  }
+}
+
 async function listSppg(req, res, next) {
   try {
     const { page, limit, skip } = parsePagination(req.query);
@@ -104,6 +113,18 @@ async function detailSppg(req, res, next) {
       totalPorsi: d.totalPorsi,
     }));
 
+    const latestDist = dist30.length ? dist30[dist30.length - 1] : null;
+    const latestCatatan = latestDist ? await prisma.distribusiMbg.findUnique({
+      where: {
+        sppgId_tanggalDistribusi: {
+          sppgId: id,
+          tanggalDistribusi: latestDist.tanggalDistribusi,
+        },
+      },
+      select: { catatan: true, tanggalDistribusi: true },
+    }) : null;
+    const metaDummy = latestCatatan ? parseDistribusiCatatan(latestCatatan.catatan) : null;
+
     const jumlahPenerima = await prisma.penerimaManfaat.count({
       where: { sppgId: id, statusAktif: true },
     });
@@ -117,6 +138,9 @@ async function detailSppg(req, res, next) {
         persentaseRealisasi30Hari: Math.round(persentaseRealisasi * 100) / 100,
         jumlahPenerimaAktif: jumlahPenerima,
         distribusi7HariTerakhir: dist7,
+        menuHarian: metaDummy ? metaDummy.menuHarian || null : null,
+        menuMingguan: metaDummy ? metaDummy.menuMingguan || null : null,
+        updatedMenuAt: latestCatatan ? latestCatatan.tanggalDistribusi : null,
       },
       operator: sppg.pengguna,
       pengguna: undefined,
