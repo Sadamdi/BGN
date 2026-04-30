@@ -26,4 +26,18 @@ router.get(
   ctrl.syncScrapeData
 );
 
+router.post(
+  "/sync-dummy-nutrition",
+  verifyToken,
+  requireRole("ADMIN", "PEJABAT_BGN", "PENGAWAS_GIZI"),
+  ctrl.syncDummyNutritionData
+);
+
+router.get(
+  "/sync-dummy-nutrition",
+  verifyToken,
+  requireRole("ADMIN", "PEJABAT_BGN", "PENGAWAS_GIZI"),
+  ctrl.syncDummyNutritionData
+);
+
 module.exports = router;

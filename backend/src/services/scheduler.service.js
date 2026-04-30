@@ -76,6 +76,19 @@ function startSchedulers() {
     { timezone: "Asia/Jakarta" }
   );
 
+  // Generate dummy gizi + menu harian SPPG tiap hari jam 00:20 WIB
+  cron.schedule(
+    "20 0 * * *",
+    async () => {
+      try {
+        await runScript("dummy-nutrition", "src/scripts/ingest/dummy-nutrition.ingest.js");
+      } catch (e) {
+        console.error("[cron] dummy nutrition:", e.message);
+      }
+    },
+    { timezone: "Asia/Jakarta" }
+  );
+
   console.log("[sipgn-bgn] scheduler started (Asia/Jakarta)");
 }
 

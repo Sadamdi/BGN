@@ -3,6 +3,7 @@
 const { prisma } = require("../config/database");
 const { sukses } = require("../utils/response");
 const { runBgnScrapeSync } = require("../services/bgnScrapeSync.service");
+const { runDailyDummyNutrition } = require("../services/dummyNutrition.service");
 
 async function getRingkasanPublik(req, res, next) {
   try {
@@ -123,9 +124,33 @@ async function syncScrapeData(req, res, next) {
   }
 }
 
+async function syncDummyNutritionData(req, res, next) {
+  try {
+    const totalRecords = Number(req.body && req.body.totalRecords) || 1000;
+    const result = await runDailyDummyNutrition({
+      trigger: "manual_api",
+      totalRecords,
+    });
+    if (result && result.skipped) {
+      return sukses(
+        res,
+        {
+          skipped: true,
+          reason: result.message || "Generator sedang berjalan",
+        },
+        "Generator data dummy sedang berjalan, coba lagi sebentar"
+      );
+    }
+    return sukses(res, result, "Generator data dummy gizi harian berhasil dijalankan");
+  } catch (err) {
+    return next(err);
+  }
+}
+
 module.exports = {
   getRingkasanPublik,
   getRealtimeSummary,
   realtimeStream,
   syncScrapeData,
+  syncDummyNutritionData,
 };
