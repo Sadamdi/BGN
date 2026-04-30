@@ -126,10 +126,12 @@ async function syncScrapeData(req, res, next) {
 
 async function syncDummyNutritionData(req, res, next) {
   try {
-    const totalRecords = Number(req.body && req.body.totalRecords) || 1000;
+    const totalRecords = Number(req.body && req.body.totalRecords);
+    const totalMenus = Number(req.body && req.body.totalMenus) || 1000;
     const result = await runDailyDummyNutrition({
       trigger: "manual_api",
       totalRecords,
+      totalMenus,
     });
     if (result && result.skipped) {
       return sukses(
