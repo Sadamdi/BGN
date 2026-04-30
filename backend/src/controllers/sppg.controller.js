@@ -178,7 +178,6 @@ async function detailSppg(req, res, next) {
             effectiveCapacity *
                 seededNumber(id + "|d7|" + idx + "|" + dayjs().format("YYYY-MM-DD"), 0.35, 0.95)
             )
-          )
         ),
       };
     });
