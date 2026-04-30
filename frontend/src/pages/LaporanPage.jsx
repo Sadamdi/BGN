@@ -70,8 +70,9 @@ export default function LaporanPage() {
       let r;
       if (jenis === "distribusi") r = await laporanApi.previewDistribusi(buildBody());
       else if (jenis === "status-gizi") r = await laporanApi.previewStatusGizi(buildBody());
+      else if (jenis === "kinerja-sppg") r = await laporanApi.previewKinerjaSppg(buildBody());
       else {
-        message.info("Pratinjau hanya tersedia untuk Distribusi & Status Gizi.");
+        message.info("Pratinjau belum tersedia untuk tipe laporan ini.");
         setLoading(false);
         return;
       }
@@ -133,6 +134,17 @@ export default function LaporanPage() {
     { title: "Tgl Ukur", dataIndex: "tanggalPengukuran", render: (v) => v ? dayjs(v).format("DD/MM/YYYY") : "-" },
     { title: "Z BB/U", dataIndex: "zscoreBbU" },
     { title: "Status", dataIndex: "statusGizi" },
+  ];
+
+  const columnsKinerja = [
+    { title: "Kode", dataIndex: "kodeSppg" },
+    { title: "Nama SPPG", dataIndex: "namaSppg" },
+    { title: "Provinsi", dataIndex: "provinsi" },
+    { title: "Kapasitas/Hari", dataIndex: "kapasitas", align: "right" },
+    { title: "Rata-rata Porsi", dataIndex: "rataRata", align: "right" },
+    { title: "Realisasi %", dataIndex: "realisasiPersen", align: "right" },
+    { title: "Menu Hari Ini", dataIndex: "totalMenuHariIni", align: "right" },
+    { title: "Energi Hari Ini", dataIndex: "energiHariIni", align: "right" },
   ];
 
   return (
@@ -222,6 +234,9 @@ export default function LaporanPage() {
             ) : null}
             {preview && jenis === "status-gizi" ? (
               <Table rowKey={(r) => r.namaLengkap + r.tanggalPengukuran} columns={columnsGizi} dataSource={preview.rows} pagination={false} size="small" scroll={{ x: 800 }} />
+            ) : null}
+            {preview && jenis === "kinerja-sppg" ? (
+              <Table rowKey={(r) => r.kodeSppg} columns={columnsKinerja} dataSource={preview.rows} pagination={false} size="small" scroll={{ x: 900 }} />
             ) : null}
           </Card>
 

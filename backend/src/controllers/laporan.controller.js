@@ -45,6 +45,15 @@ async function previewStatusGizi(req, res, next) {
   }
 }
 
+async function previewKinerjaSppg(req, res, next) {
+  try {
+    const data = await laporanService.previewKinerjaSppg({ user: req.user, filter: req.body || {} });
+    return sukses(res, { totalRows: data.totalRows, summary: data.summary, rows: data.rows });
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function excelStatusGizi(req, res, next) {
   try {
     const wb = await laporanService.exportStatusGizi({ user: req.user, filter: req.body || {} });
@@ -177,6 +186,7 @@ module.exports = {
   previewDistribusi,
   excelDistribusi,
   previewStatusGizi,
+  previewKinerjaSppg,
   excelStatusGizi,
   excelKinerjaSppg,
   excelPenerima,

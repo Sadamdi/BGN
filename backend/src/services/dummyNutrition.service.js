@@ -9,6 +9,7 @@ const { hitungZScore, klasifikasiStatusGizi } = require("./zscore.service");
 
 const JOB_LOCK_KEY = "job:dummy-nutrition-daily";
 const TZ = "Asia/Jakarta";
+const WEEKDAY_KEYS = ["senin", "selasa", "rabu", "kamis", "jumat", "sabtu", "minggu"];
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -128,6 +129,101 @@ function buildMenuPool(totalMenus) {
   return pool;
 }
 
+function weekdayIndexFromDate(date) {
+  const d = dayjs(date).day();
+  // dayjs: 0 Minggu ... 6 Sabtu
+  if (d === 0) return 6;
+  return d - 1;
+}
+
+function hashString(text) {
+  let h = 0;
+  const s = String(text || "");
+  for (let i = 0; i < s.length; i++) {
+    h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  }
+  return h;
+}
+
+function deterministicPickMenus(seed, pool, minCount, maxCount) {
+  const count = Math.max(minCount, Math.min(maxCount, (seed % maxCount) + 1));
+  const copy = pool.slice();
+  const out = [];
+  let localSeed = seed || 1;
+  for (let i = 0; i < count && copy.length; i++) {
+    localSeed = (localSeed * 1664525 + 1013904223) >>> 0;
+    const idx = localSeed % copy.length;
+    out.push(copy[idx]);
+    copy.splice(idx, 1);
+  }
+  return out;
+}
+
+function buildWeeklyMenuPlanForSppg(sppgId, weekKey, menuPool) {
+  const shortPool = menuPool.slice(0, 300);
+  const weekly = {};
+  WEEKDAY_KEYS.forEach((dayKey, idx) => {
+    const seed = hashString(sppgId + "|" + weekKey + "|" + dayKey + "|" + idx);
+    const menus = deterministicPickMenus(seed, shortPool, 1, 10);
+    const nutrition = menus.reduce(
+      (acc, m) => {
+        acc.energyKkal += m.totalNutrition.energyKkal;
+        acc.proteinG += m.totalNutrition.proteinG;
+        acc.fatG += m.totalNutrition.fatG;
+        acc.carbsG += m.totalNutrition.carbsG;
+        acc.fiberG += m.totalNutrition.fiberG;
+        acc.sodiumMg += m.totalNutrition.sodiumMg;
+        return acc;
+      },
+      { energyKkal: 0, proteinG: 0, fatG: 0, carbsG: 0, fiberG: 0, sodiumMg: 0 }
+    );
+    weekly[dayKey] = {
+      menuCount: menus.length,
+      menus: menus.map((m) => ({
+        code: m.code,
+        title: m.title,
+        totalNutrition: m.totalNutrition,
+      })),
+      totalNutrition: {
+        energyKkal: round2(nutrition.energyKkal),
+        proteinG: round2(nutrition.proteinG),
+        fatG: round2(nutrition.fatG),
+        carbsG: round2(nutrition.carbsG),
+        fiberG: round2(nutrition.fiberG),
+        sodiumMg: round2(nutrition.sodiumMg),
+      },
+    };
+  });
+  return weekly;
+}
+
+function distributeByCapacity(sppgs, totalRecords) {
+  const active = sppgs.filter((s) => Number(s.kapasitasPorsiPerHari) > 0);
+  const totalCapacity = active.reduce((sum, s) => sum + Math.max(1, Number(s.kapasitasPorsiPerHari || 1)), 0);
+  const map = new Map();
+  if (!active.length) return map;
+  let assigned = 0;
+  for (const s of active) {
+    const raw = (Math.max(1, Number(s.kapasitasPorsiPerHari || 1)) / totalCapacity) * totalRecords;
+    const base = Math.max(1, Math.floor(raw));
+    const capped = Math.min(base, Math.max(1, Number(s.kapasitasPorsiPerHari || 1)));
+    map.set(s.id, capped);
+    assigned += capped;
+  }
+  // distribute remaining slots while honoring capacity.
+  let loops = 0;
+  while (assigned < totalRecords && loops < totalRecords * 2) {
+    loops++;
+    const s = active[randInt(0, active.length - 1)];
+    const cap = Math.max(1, Number(s.kapasitasPorsiPerHari || 1));
+    const cur = map.get(s.id) || 0;
+    if (cur >= cap) continue;
+    map.set(s.id, cur + 1);
+    assigned++;
+  }
+  return map;
+}
+
 function estimateAnthropometry(recipient, menu) {
   const kategori = recipient.kategori;
   if (kategori === "BALITA") {
@@ -193,7 +289,10 @@ async function runDailyDummyNutrition(options = {}) {
   const now = dayjs().tz(TZ);
   const runDate = now.startOf("day").toDate();
   const generatedAt = now.toDate();
-  const menuPool = buildMenuPool(totalRecords);
+  const menuPool = buildMenuPool(Math.max(1200, totalRecords));
+  const weekKey = now.startOf("week").format("YYYY-[W]WW");
+  const weekdayIdx = weekdayIndexFromDate(runDate);
+  const weekdayKey = WEEKDAY_KEYS[weekdayIdx];
 
   return withJobLock(async () => {
     const [sppgs, recipients, operators, fallbackPetugas] = await Promise.all([
@@ -236,64 +335,81 @@ async function runDailyDummyNutrition(options = {}) {
     }
 
     const sppgPool = sppgs.filter((s) => (recipientBySppg.get(s.id) || []).length > 0);
+    const allocation = distributeByCapacity(sppgPool, totalRecords);
     const pemantauanRows = [];
     const distribusiAgg = new Map();
 
-    for (let i = 0; i < totalRecords; i++) {
-      const sppg = sppgPool[randInt(0, sppgPool.length - 1)];
+    const dailyMenusBySppg = new Map();
+    for (const s of sppgPool) {
+      const weeklyPlan = buildWeeklyMenuPlanForSppg(s.id, weekKey, menuPool);
+      const todayPlan = weeklyPlan[weekdayKey];
+      dailyMenusBySppg.set(s.id, { weeklyPlan, todayPlan });
+    }
+
+    for (const sppg of sppgPool) {
       const recPool = recipientBySppg.get(sppg.id);
-      const recipient = recPool[randInt(0, recPool.length - 1)];
-      const menu = menuPool[i];
+      const target = allocation.get(sppg.id) || 0;
+      const daily = dailyMenusBySppg.get(sppg.id);
+      if (!target || !daily || !daily.todayPlan || !daily.todayPlan.menus.length) continue;
+      for (let i = 0; i < target; i++) {
+        const recipient = recPool[randInt(0, recPool.length - 1)];
+        const menuLite = daily.todayPlan.menus[i % daily.todayPlan.menus.length];
+        const menu =
+          menuPool.find((m) => m.code === menuLite.code) ||
+          menuPool[randInt(0, menuPool.length - 1)];
 
-      const anthropo = estimateAnthropometry(recipient, menu);
-      const z = hitungZScore({
-        beratBadanKg: anthropo.beratBadanKg,
-        tinggiBadanCm: anthropo.tinggiBadanCm,
-        usiaBulan: anthropo.usiaBulan,
-        jenisKelamin: recipient.jenisKelamin,
-      });
-      const klas = klasifikasiStatusGizi(z);
-      const preferred = chooseStatusFromMenu(menu);
-      const statusGizi = klas.statusGizi === "GIZI_BAIK" ? preferred : klas.statusGizi;
+        const anthropo = estimateAnthropometry(recipient, menu);
+        const z = hitungZScore({
+          beratBadanKg: anthropo.beratBadanKg,
+          tinggiBadanCm: anthropo.tinggiBadanCm,
+          usiaBulan: anthropo.usiaBulan,
+          jenisKelamin: recipient.jenisKelamin,
+        });
+        const klas = klasifikasiStatusGizi(z);
+        const preferred = chooseStatusFromMenu(menu);
+        const statusGizi = klas.statusGizi === "GIZI_BAIK" ? preferred : klas.statusGizi;
 
-      const petugasId = operatorBySppg.get(sppg.id) || fallbackPetugasId;
-      pemantauanRows.push({
-        penerimaId: recipient.id,
-        tanggalPengukuran: runDate,
-        beratBadanKg: anthropo.beratBadanKg,
-        tinggiBadanCm: anthropo.tinggiBadanCm,
-        lilaCm: anthropo.lilaCm,
-        usiaBulan: anthropo.usiaBulan,
-        zscoreBbU: z.zscoreBbU,
-        zscoreTbU: z.zscoreTbU,
-        zscoreBbTb: z.zscoreBbTb,
-        statusGizi,
-        stunting: klas.stunting,
-        petugasId,
-        catatan:
-          anthropo.catatan +
-          " Nutrisi total: " +
-          JSON.stringify(menu.totalNutrition) +
-          ". Menu: " +
-          menu.items.map((x) => x.name).join(", "),
-      });
+        const petugasId = operatorBySppg.get(sppg.id) || fallbackPetugasId;
+        pemantauanRows.push({
+          penerimaId: recipient.id,
+          tanggalPengukuran: runDate,
+          beratBadanKg: anthropo.beratBadanKg,
+          tinggiBadanCm: anthropo.tinggiBadanCm,
+          lilaCm: anthropo.lilaCm,
+          usiaBulan: anthropo.usiaBulan,
+          zscoreBbU: z.zscoreBbU,
+          zscoreTbU: z.zscoreTbU,
+          zscoreBbTb: z.zscoreBbTb,
+          statusGizi,
+          stunting: klas.stunting,
+          petugasId,
+          catatan:
+            anthropo.catatan +
+            " Nutrisi total: " +
+            JSON.stringify(menu.totalNutrition) +
+            ". Menu: " +
+            menu.items.map((x) => x.name).join(", "),
+        });
 
-      const agg = distribusiAgg.get(sppg.id) || {
-        sppg,
-        porsiPesertaDidik: 0,
-        porsiBalita: 0,
-        porsiIbuHamil: 0,
-        porsiIbuMenyusui: 0,
-        menuSamples: [],
-        totalEnergy: 0,
-      };
-      if (recipient.kategori === "PESERTA_DIDIK") agg.porsiPesertaDidik += 1;
-      else if (recipient.kategori === "BALITA") agg.porsiBalita += 1;
-      else if (recipient.kategori === "IBU_HAMIL") agg.porsiIbuHamil += 1;
-      else agg.porsiIbuMenyusui += 1;
-      agg.totalEnergy += menu.totalNutrition.energyKkal;
-      if (agg.menuSamples.length < 7) agg.menuSamples.push(menu);
-      distribusiAgg.set(sppg.id, agg);
+        const agg = distribusiAgg.get(sppg.id) || {
+          sppg,
+          porsiPesertaDidik: 0,
+          porsiBalita: 0,
+          porsiIbuHamil: 0,
+          porsiIbuMenyusui: 0,
+          menuSamples: [],
+          totalEnergy: 0,
+          weeklyPlan: daily.weeklyPlan,
+          todayPlan: daily.todayPlan,
+        };
+        if (recipient.kategori === "PESERTA_DIDIK") agg.porsiPesertaDidik += 1;
+        else if (recipient.kategori === "BALITA") agg.porsiBalita += 1;
+        else if (recipient.kategori === "IBU_HAMIL") agg.porsiIbuHamil += 1;
+        else agg.porsiIbuMenyusui += 1;
+        agg.totalEnergy += menu.totalNutrition.energyKkal;
+        if (agg.menuSamples.length < 10) agg.menuSamples.push(menu);
+        distribusiAgg.set(sppg.id, agg);
+      }
     }
 
     const upsertDistribusi = [];
@@ -325,6 +441,9 @@ async function runDailyDummyNutrition(options = {}) {
               generatedAt: generatedAt.toISOString(),
               realisasiPersen,
               totalMenuGenerated: totalRecords,
+              weekdayKey,
+              menuHarian: agg.todayPlan,
+              menuMingguan: agg.weeklyPlan,
               menuHarianSampel: agg.menuSamples.map((m) => ({
                 code: m.code,
                 title: m.title,
@@ -350,6 +469,9 @@ async function runDailyDummyNutrition(options = {}) {
               generatedAt: generatedAt.toISOString(),
               realisasiPersen,
               totalMenuGenerated: totalRecords,
+              weekdayKey,
+              menuHarian: agg.todayPlan,
+              menuMingguan: agg.weeklyPlan,
               menuHarianSampel: agg.menuSamples.map((m) => ({
                 code: m.code,
                 title: m.title,
@@ -381,7 +503,7 @@ async function runDailyDummyNutrition(options = {}) {
         notes:
           "Generator dummy harian: " +
           totalRecords +
-          " menu acak (3-7 item) + pemantauan gizi, disebar ke SPPG aktif.",
+          " menu acak + pemantauan gizi, disebar berbobot kapasitas ke SPPG aktif.",
       },
     });
 
@@ -392,6 +514,8 @@ async function runDailyDummyNutrition(options = {}) {
       totalMenuPool: menuPool.length,
       totalPemantauanInserted: pemantauanRows.length,
       totalSppgUpdated: distribusiAgg.size,
+      weekdayKey,
+      weekKey,
     };
   });
 }

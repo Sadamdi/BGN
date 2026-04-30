@@ -16,6 +16,15 @@ function buildAccessFilter(user, extra = {}) {
   return extra;
 }
 
+function parseDistribusiMeta(catatan) {
+  if (!catatan) return null;
+  try {
+    return typeof catatan === "string" ? JSON.parse(catatan) : catatan;
+  } catch (_) {
+    return null;
+  }
+}
+
 async function fetchDistribusi({ user, filter }) {
   const where = buildAccessFilter(user, {});
   if (filter.sppgId) where.sppgId = filter.sppgId;
@@ -35,18 +44,31 @@ async function fetchDistribusi({ user, filter }) {
 
 async function previewDistribusi({ user, filter }) {
   const rows = await fetchDistribusi({ user, filter });
-  const totalPorsi = rows.reduce((s, r) => s + r.totalPorsi, 0);
+  const enriched = rows.map((r) => {
+    const meta = parseDistribusiMeta(r.catatan);
+    return {
+      ...r,
+      menuHarian: meta && meta.menuHarian ? meta.menuHarian : null,
+      menuMingguan: meta && meta.menuMingguan ? meta.menuMingguan : null,
+      totalMenuHariIni: meta && meta.menuHarian ? meta.menuHarian.menuCount : 0,
+      totalEnergiHariIni: meta && meta.menuHarian && meta.menuHarian.totalNutrition ? meta.menuHarian.totalNutrition.energyKkal : 0,
+    };
+  });
+  const totalPorsi = enriched.reduce((s, r) => s + r.totalPorsi, 0);
   return {
-    totalRows: rows.length,
+    totalRows: enriched.length,
     summary: {
-      "Total Laporan": rows.length,
+      "Total Laporan": enriched.length,
       "Total Porsi": totalPorsi,
-      "Total Peserta Didik": rows.reduce((s, r) => s + r.porsiPesertaDidik, 0),
-      "Total Balita": rows.reduce((s, r) => s + r.porsiBalita, 0),
-      "Total Ibu Hamil": rows.reduce((s, r) => s + r.porsiIbuHamil, 0),
-      "Total Ibu Menyusui": rows.reduce((s, r) => s + r.porsiIbuMenyusui, 0),
+      "Total Peserta Didik": enriched.reduce((s, r) => s + r.porsiPesertaDidik, 0),
+      "Total Balita": enriched.reduce((s, r) => s + r.porsiBalita, 0),
+      "Total Ibu Hamil": enriched.reduce((s, r) => s + r.porsiIbuHamil, 0),
+      "Total Ibu Menyusui": enriched.reduce((s, r) => s + r.porsiIbuMenyusui, 0),
+      "Rata-rata Menu/Hari": enriched.length
+        ? Math.round((enriched.reduce((s, r) => s + (r.totalMenuHariIni || 0), 0) / enriched.length) * 100) / 100
+        : 0,
     },
-    rows: rows.slice(0, 100),
+    rows: enriched.slice(0, 100),
   };
 }
 
@@ -180,6 +202,60 @@ async function exportKinerjaSppg({ user, filter }) {
   return excelService.generateLaporanKinerjaSppg({ rows, filter });
 }
 
+async function previewKinerjaSppg({ user, filter }) {
+  const where = buildAccessFilter(user, { statusAktif: true });
+  if (filter.provinsi) where.provinsi = filter.provinsi;
+
+  const sppgs = await prisma.sppg.findMany({
+    where,
+    include: { _count: { select: { penerimaManfaat: { where: { statusAktif: true } } } } },
+  });
+  const since = filter.periodeAwal ? startOfDay(filter.periodeAwal) : dayjs().subtract(30, "day").startOf("day").toDate();
+  const ids = sppgs.map((s) => s.id);
+  const dist = await prisma.distribusiMbg.findMany({
+    where: { sppgId: { in: ids }, tanggalDistribusi: { gte: since } },
+    select: { sppgId: true, totalPorsi: true, catatan: true, tanggalDistribusi: true },
+    orderBy: { tanggalDistribusi: "desc" },
+  });
+  const map = new Map();
+  const latestMeta = new Map();
+  for (const d of dist) {
+    const cur = map.get(d.sppgId) || { sum: 0, n: 0 };
+    cur.sum += d.totalPorsi;
+    cur.n += 1;
+    map.set(d.sppgId, cur);
+    if (!latestMeta.has(d.sppgId)) latestMeta.set(d.sppgId, parseDistribusiMeta(d.catatan));
+  }
+  const rows = sppgs.map((s) => {
+    const c = map.get(s.id) || { sum: 0, n: 0 };
+    const rata = c.n > 0 ? c.sum / c.n : 0;
+    const realisasi = s.kapasitasPorsiPerHari > 0 ? (rata / s.kapasitasPorsiPerHari) * 100 : 0;
+    const meta = latestMeta.get(s.id) || null;
+    const menuHarian = meta && meta.menuHarian ? meta.menuHarian : null;
+    return {
+      kodeSppg: s.kodeSppg,
+      namaSppg: s.namaSppg,
+      provinsi: s.provinsi,
+      kapasitas: s.kapasitasPorsiPerHari,
+      rataRata: Math.round(rata),
+      realisasiPersen: Math.round(realisasi * 100) / 100,
+      penerimaAktif: s._count.penerimaManfaat,
+      totalMenuHariIni: menuHarian ? menuHarian.menuCount : 0,
+      energiHariIni: menuHarian && menuHarian.totalNutrition ? menuHarian.totalNutrition.energyKkal : 0,
+      statusAktif: s.statusAktif,
+    };
+  });
+  return {
+    totalRows: rows.length,
+    summary: {
+      "Total SPPG": rows.length,
+      "Rata-rata Realisasi %": rows.length ? Math.round((rows.reduce((s, r) => s + (r.realisasiPersen || 0), 0) / rows.length) * 100) / 100 : 0,
+      "Total Menu Hari Ini": rows.reduce((s, r) => s + (r.totalMenuHariIni || 0), 0),
+    },
+    rows,
+  };
+}
+
 async function exportPenerima({ user, filter }) {
   const where = buildAccessFilter(user, {});
   if (filter.kategori) where.kategori = filter.kategori;
@@ -240,6 +316,7 @@ module.exports = {
   previewStatusGizi,
   exportStatusGizi,
   exportKinerjaSppg,
+  previewKinerjaSppg,
   exportPenerima,
   jalankanJadwalAktif,
   MAX_ROWS,

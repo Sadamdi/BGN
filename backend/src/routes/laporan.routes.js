@@ -15,6 +15,7 @@ router.post("/distribusi/pdf", ctrl.pdfDistribusi);
 
 router.post("/status-gizi/preview", requireRole("ADMIN", "PEJABAT_BGN", "PENGAWAS_GIZI"), ctrl.previewStatusGizi);
 router.post("/status-gizi/excel", requireRole("ADMIN", "PEJABAT_BGN", "PENGAWAS_GIZI"), ctrl.excelStatusGizi);
+router.post("/kinerja-sppg/preview", requireRole("ADMIN", "PEJABAT_BGN", "PENGAWAS_GIZI"), ctrl.previewKinerjaSppg);
 
 router.post("/kinerja-sppg/excel", requireRole("ADMIN", "PEJABAT_BGN", "PENGAWAS_GIZI"), ctrl.excelKinerjaSppg);
 router.post("/penerima/excel", requireRole("ADMIN", "PEJABAT_BGN", "PENGAWAS_GIZI", "OPERATOR_SPPG"), ctrl.excelPenerima);
