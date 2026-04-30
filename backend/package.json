@@ -14,8 +14,9 @@
     "prisma:seed": "node prisma/seed.js",
     "ingest:public": "node src/scripts/ingest/public-data.ingest.js",
     "ingest:bgn-scrape": "node src/scripts/ingest/bgn-scrape.ingest.js",
+    "ingest:dummy-nutrition": "node src/scripts/ingest/dummy-nutrition.ingest.js",
     "ingest:realtime": "node src/scripts/ingest/realtime-generator.js",
-    "ingest:all": "npm run ingest:public && npm run ingest:bgn-scrape && npm run ingest:realtime",
+    "ingest:all": "npm run ingest:public && npm run ingest:bgn-scrape && npm run ingest:dummy-nutrition && npm run ingest:realtime",
     "test": "jest --runInBand --detectOpenHandles --coverage",
     "test:watch": "jest --watch"
   },

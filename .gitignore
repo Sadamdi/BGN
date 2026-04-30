@@ -24,3 +24,6 @@ AGENTS.md
 prompt_master.md
 .vercel
 .env*.local
+.env.check
+.env.prod.now
+.env.swap
