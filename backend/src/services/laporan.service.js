@@ -22,6 +22,14 @@ function seededRange(seed, min, max) {
   return min + (max - min) * n;
 }
 
+function computeEffectiveCapacity({ sppgId, kapasitasPorsiPerHari, penerimaAktif }) {
+  const base = Math.max(0, Number(kapasitasPorsiPerHari || 0));
+  if (base > 1) return Math.round(base);
+  const penerima = Math.max(0, Number(penerimaAktif || 0));
+  if (penerima > 0) return Math.max(25, Math.round(penerima));
+  return Math.round(seededRange(simpleHash(sppgId + "|kapasitas"), 120, 480));
+}
+
 function buildAccessFilter(user, extra = {}) {
   const f = buildSppgFilter(user);
   if (f.sppgId) return { ...extra, sppgId: f.sppgId };
@@ -253,6 +261,7 @@ async function exportStatusGizi({ user, filter }) {
 
 async function exportKinerjaSppg({ user, filter }) {
   const where = buildAccessFilter(user, { statusAktif: true });
+  if (filter.sppgId) where.id = filter.sppgId;
   if (filter.provinsi) where.provinsi = filter.provinsi;
 
   const sppgs = await prisma.sppg.findMany({
@@ -274,13 +283,18 @@ async function exportKinerjaSppg({ user, filter }) {
   }
   const rows = sppgs.map((s) => {
     const c = map.get(s.id) || { sum: 0, n: 0 };
+    const kapasitasEfektif = computeEffectiveCapacity({
+      sppgId: s.id,
+      kapasitasPorsiPerHari: s.kapasitasPorsiPerHari,
+      penerimaAktif: s._count.penerimaManfaat,
+    });
     const rata = c.n > 0 ? c.sum / c.n : 0;
-    const realisasi = s.kapasitasPorsiPerHari > 0 ? (rata / s.kapasitasPorsiPerHari) * 100 : 0;
+    const realisasi = kapasitasEfektif > 0 ? (rata / kapasitasEfektif) * 100 : 0;
     return {
       kodeSppg: s.kodeSppg,
       namaSppg: s.namaSppg,
       provinsi: s.provinsi,
-      kapasitas: s.kapasitasPorsiPerHari,
+      kapasitas: kapasitasEfektif,
       rataRata: Math.round(rata),
       realisasiPersen: Math.round(realisasi * 100) / 100,
       penerimaAktif: s._count.penerimaManfaat,
@@ -292,6 +306,7 @@ async function exportKinerjaSppg({ user, filter }) {
 
 async function previewKinerjaSppg({ user, filter }) {
   const where = buildAccessFilter(user, { statusAktif: true });
+  if (filter.sppgId) where.id = filter.sppgId;
   if (filter.provinsi) where.provinsi = filter.provinsi;
 
   const sppgs = await prisma.sppg.findMany({
@@ -316,8 +331,13 @@ async function previewKinerjaSppg({ user, filter }) {
   }
   const rows = sppgs.map((s) => {
     const c = map.get(s.id) || { sum: 0, n: 0 };
+    const kapasitasEfektif = computeEffectiveCapacity({
+      sppgId: s.id,
+      kapasitasPorsiPerHari: s.kapasitasPorsiPerHari,
+      penerimaAktif: s._count.penerimaManfaat,
+    });
     const rata = c.n > 0 ? c.sum / c.n : 0;
-    const realisasi = s.kapasitasPorsiPerHari > 0 ? (rata / s.kapasitasPorsiPerHari) * 100 : 0;
+    const realisasi = kapasitasEfektif > 0 ? (rata / kapasitasEfektif) * 100 : 0;
     const meta = latestMeta.get(s.id) || null;
     const fallback = (!meta || !meta.menuHarian)
       ? buildSyntheticMenuSnapshotForSppg({ sppgId: s.id, date: new Date(), totalMenus: 1000 })
@@ -327,7 +347,7 @@ async function previewKinerjaSppg({ user, filter }) {
       kodeSppg: s.kodeSppg,
       namaSppg: s.namaSppg,
       provinsi: s.provinsi,
-      kapasitas: s.kapasitasPorsiPerHari,
+      kapasitas: kapasitasEfektif,
       rataRata: Math.round(rata),
       realisasiPersen: Math.round(realisasi * 100) / 100,
       penerimaAktif: s._count.penerimaManfaat,

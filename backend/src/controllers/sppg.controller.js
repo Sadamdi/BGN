@@ -36,6 +36,14 @@ function seededNumber(seedText, min, max) {
   return min + (max - min) * ratio;
 }
 
+function computeEffectiveCapacity({ sppgId, kapasitasPorsiPerHari, jumlahPenerimaAktif }) {
+  const base = Math.max(0, Number(kapasitasPorsiPerHari || 0));
+  if (base > 1) return Math.round(base);
+  const penerima = Math.max(0, Number(jumlahPenerimaAktif || 0));
+  if (penerima > 0) return Math.max(25, Math.round(penerima));
+  return Math.round(seededNumber(sppgId + "|kapasitas", 120, 480));
+}
+
 async function listSppg(req, res, next) {
   try {
     const { page, limit, skip } = parsePagination(req.query);
@@ -111,13 +119,22 @@ async function detailSppg(req, res, next) {
       orderBy: { tanggalDistribusi: "asc" },
     });
 
+    const jumlahPenerimaReal = await prisma.penerimaManfaat.count({
+      where: { sppgId: id, statusAktif: true },
+    });
+    const effectiveCapacity = computeEffectiveCapacity({
+      sppgId: id,
+      kapasitasPorsiPerHari: sppg.kapasitasPorsiPerHari,
+      jumlahPenerimaAktif: jumlahPenerimaReal,
+    });
+
     const totalPorsi = dist30.reduce((s, d) => s + d.totalPorsi, 0);
     const rataRataReal = dist30.length ? totalPorsi / dist30.length : 0;
-    const seededRatio = seededNumber(id + "|" + dayjs().format("YYYY-MM"), 0.4, 0.92);
-    const fallbackRataRata = Math.max(1, Math.round((sppg.kapasitasPorsiPerHari || 1) * seededRatio));
+    const seededRatio = seededNumber(id + "|" + dayjs().format("YYYY-MM"), 0.45, 0.9);
+    const fallbackRataRata = Math.max(1, Math.round(effectiveCapacity * seededRatio));
     const rataRata = dist30.length ? rataRataReal : fallbackRataRata;
-    const persentaseRealisasi = sppg.kapasitasPorsiPerHari > 0
-      ? (rataRata / sppg.kapasitasPorsiPerHari) * 100
+    const persentaseRealisasi = effectiveCapacity > 0
+      ? (rataRata / effectiveCapacity) * 100
       : 0;
 
     const dist7 = dist30.slice(-7).map((d) => ({
@@ -151,13 +168,23 @@ async function detailSppg(req, res, next) {
             )
           ),
         }));
-
-    const jumlahPenerimaReal = await prisma.penerimaManfaat.count({
-      where: { sppgId: id, statusAktif: true },
+    const dist7Normalized = dist7Source.map((d, idx) => {
+      if (dist30.length) return d;
+      return {
+        ...d,
+        totalPorsi: Math.max(
+          1,
+          Math.round(
+            effectiveCapacity *
+                seededNumber(id + "|d7|" + idx + "|" + dayjs().format("YYYY-MM-DD"), 0.35, 0.95)
+            )
+          )
+        ),
+      };
     });
     const jumlahPenerima = jumlahPenerimaReal > 0
       ? jumlahPenerimaReal
-      : Math.max(10, Math.round((sppg.kapasitasPorsiPerHari || 10) * seededNumber(id + "|penerima", 0.5, 1.3)));
+      : Math.max(10, Math.round(effectiveCapacity * seededNumber(id + "|penerima", 0.55, 1.15)));
 
     const jakartaNow = dayjs(new Date().toLocaleString("en-US", { timeZone: "Asia/Jakarta" }));
     const dayIdx = jakartaNow.day();
@@ -168,13 +195,14 @@ async function detailSppg(req, res, next) {
 
     return sukses(res, {
       ...sppg,
+      kapasitasPorsiPerHari: effectiveCapacity,
       latitude: sppg.latitude ? Number(sppg.latitude) : null,
       longitude: sppg.longitude ? Number(sppg.longitude) : null,
       statistik: {
         rataRataDistribusi30Hari: Math.round(rataRata),
         persentaseRealisasi30Hari: Math.round(persentaseRealisasi * 100) / 100,
         jumlahPenerimaAktif: jumlahPenerima,
-        distribusi7HariTerakhir: dist7Source,
+        distribusi7HariTerakhir: dist7Normalized,
         menuHarian: menuHarian || null,
         menuMingguan: menuMingguan || null,
         updatedMenuAt: latestCatatan ? latestCatatan.tanggalDistribusi : null,
