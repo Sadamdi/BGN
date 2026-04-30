@@ -10,6 +10,7 @@ const { invalidatePrefix } = require("../services/cache.service");
 const { HttpError } = require("../middleware/errorHandler");
 const { sanitizeString } = require("../utils/sanitize");
 const { startOfDay } = require("../utils/dateRange");
+const { buildSyntheticMenuSnapshotForSppg } = require("../services/dummyNutrition.service");
 
 function applyAccessFilter(where, user) {
   const f = buildSppgFilter(user);
@@ -113,17 +114,26 @@ async function detailSppg(req, res, next) {
       totalPorsi: d.totalPorsi,
     }));
 
-    const latestDist = dist30.length ? dist30[dist30.length - 1] : null;
-    const latestCatatan = latestDist ? await prisma.distribusiMbg.findUnique({
-      where: {
-        sppgId_tanggalDistribusi: {
-          sppgId: id,
-          tanggalDistribusi: latestDist.tanggalDistribusi,
-        },
-      },
+    const latestCatatan = await prisma.distribusiMbg.findFirst({
+      where: { sppgId: id },
       select: { catatan: true, tanggalDistribusi: true },
-    }) : null;
-    const metaDummy = latestCatatan ? parseDistribusiCatatan(latestCatatan.catatan) : null;
+      orderBy: { tanggalDistribusi: "desc" },
+    });
+    let metaDummy = latestCatatan ? parseDistribusiCatatan(latestCatatan.catatan) : null;
+    if (!metaDummy || !metaDummy.menuHarian || !metaDummy.menuMingguan) {
+      metaDummy = buildSyntheticMenuSnapshotForSppg({
+        sppgId: id,
+        date: latestCatatan ? latestCatatan.tanggalDistribusi : new Date(),
+        totalMenus: 1000,
+      });
+    }
+
+    const dist7Source = dist30.length
+      ? dist7
+      : Array.from({ length: 7 }).map((_, idx) => ({
+          tanggal: dayjs().subtract(6 - idx, "day").format("YYYY-MM-DD"),
+          totalPorsi: 0,
+        }));
 
     const jumlahPenerima = await prisma.penerimaManfaat.count({
       where: { sppgId: id, statusAktif: true },
@@ -137,7 +147,7 @@ async function detailSppg(req, res, next) {
         rataRataDistribusi30Hari: Math.round(rataRata),
         persentaseRealisasi30Hari: Math.round(persentaseRealisasi * 100) / 100,
         jumlahPenerimaAktif: jumlahPenerima,
-        distribusi7HariTerakhir: dist7,
+        distribusi7HariTerakhir: dist7Source,
         menuHarian: metaDummy ? metaDummy.menuHarian || null : null,
         menuMingguan: metaDummy ? metaDummy.menuMingguan || null : null,
         updatedMenuAt: latestCatatan ? latestCatatan.tanggalDistribusi : null,
