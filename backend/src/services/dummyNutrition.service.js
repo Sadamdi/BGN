@@ -14,40 +14,131 @@ const WEEKDAY_KEYS = ["senin", "selasa", "rabu", "kamis", "jumat", "sabtu", "min
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
-const MENU_FOOD_CATALOG = [
-  { name: "Nasi Putih", energyKkal: 175, proteinG: 3.4, fatG: 0.4, carbsG: 39.8, fiberG: 0.3, sodiumMg: 2 },
-  { name: "Nasi Merah", energyKkal: 170, proteinG: 3.8, fatG: 1.0, carbsG: 35.2, fiberG: 1.8, sodiumMg: 3 },
-  { name: "Ubi Rebus", energyKkal: 111, proteinG: 1.6, fatG: 0.1, carbsG: 26.2, fiberG: 3.0, sodiumMg: 55 },
-  { name: "Jagung Rebus", energyKkal: 144, proteinG: 4.1, fatG: 1.3, carbsG: 31.0, fiberG: 2.9, sodiumMg: 15 },
-  { name: "Roti Gandum", energyKkal: 128, proteinG: 5.1, fatG: 2.0, carbsG: 22.1, fiberG: 3.2, sodiumMg: 215 },
-  { name: "Telur Rebus", energyKkal: 78, proteinG: 6.3, fatG: 5.3, carbsG: 0.6, fiberG: 0, sodiumMg: 62 },
-  { name: "Ayam Panggang", energyKkal: 165, proteinG: 31.0, fatG: 3.6, carbsG: 0, fiberG: 0, sodiumMg: 74 },
-  { name: "Ikan Kembung", energyKkal: 167, proteinG: 21.4, fatG: 8.2, carbsG: 0, fiberG: 0, sodiumMg: 90 },
-  { name: "Ikan Tuna", energyKkal: 145, proteinG: 23.5, fatG: 4.9, carbsG: 0, fiberG: 0, sodiumMg: 37 },
-  { name: "Daging Sapi Tanpa Lemak", energyKkal: 187, proteinG: 26.0, fatG: 9.0, carbsG: 0, fiberG: 0, sodiumMg: 55 },
-  { name: "Tempe Goreng Tipis", energyKkal: 150, proteinG: 12.0, fatG: 7.9, carbsG: 8.7, fiberG: 1.4, sodiumMg: 9 },
-  { name: "Tahu Kukus", energyKkal: 80, proteinG: 8.0, fatG: 4.4, carbsG: 1.5, fiberG: 0.3, sodiumMg: 7 },
-  { name: "Susu UHT Rendah Lemak", energyKkal: 90, proteinG: 6.0, fatG: 3.0, carbsG: 9.0, fiberG: 0, sodiumMg: 85 },
-  { name: "Yogurt Plain", energyKkal: 95, proteinG: 5.2, fatG: 3.3, carbsG: 11.5, fiberG: 0, sodiumMg: 50 },
-  { name: "Bayam Bening", energyKkal: 36, proteinG: 2.1, fatG: 0.5, carbsG: 6.5, fiberG: 2.2, sodiumMg: 180 },
-  { name: "Sayur Asem", energyKkal: 44, proteinG: 1.5, fatG: 0.8, carbsG: 8.3, fiberG: 2.7, sodiumMg: 220 },
-  { name: "Capcay", energyKkal: 71, proteinG: 3.1, fatG: 2.7, carbsG: 9.2, fiberG: 2.6, sodiumMg: 240 },
-  { name: "Brokoli Kukus", energyKkal: 43, proteinG: 3.5, fatG: 0.4, carbsG: 8.3, fiberG: 3.1, sodiumMg: 35 },
-  { name: "Wortel Rebus", energyKkal: 41, proteinG: 0.9, fatG: 0.2, carbsG: 9.5, fiberG: 2.7, sodiumMg: 69 },
-  { name: "Buncis Tumis", energyKkal: 58, proteinG: 2.1, fatG: 2.8, carbsG: 6.9, fiberG: 2.5, sodiumMg: 165 },
-  { name: "Pisang", energyKkal: 105, proteinG: 1.3, fatG: 0.4, carbsG: 27.0, fiberG: 3.1, sodiumMg: 1 },
-  { name: "Pepaya", energyKkal: 55, proteinG: 0.9, fatG: 0.3, carbsG: 14.0, fiberG: 2.5, sodiumMg: 8 },
-  { name: "Jeruk", energyKkal: 62, proteinG: 1.2, fatG: 0.2, carbsG: 15.4, fiberG: 3.1, sodiumMg: 0 },
-  { name: "Apel", energyKkal: 80, proteinG: 0.3, fatG: 0.2, carbsG: 21.0, fiberG: 3.8, sodiumMg: 2 },
-  { name: "Kacang Hijau Rebus", energyKkal: 105, proteinG: 7.0, fatG: 0.5, carbsG: 19.2, fiberG: 4.7, sodiumMg: 15 },
-  { name: "Sup Ayam Kentang", energyKkal: 112, proteinG: 8.2, fatG: 4.8, carbsG: 9.5, fiberG: 1.5, sodiumMg: 320 },
-  { name: "Sarden Tomat", energyKkal: 140, proteinG: 17.0, fatG: 7.0, carbsG: 2.2, fiberG: 0.3, sodiumMg: 330 },
-  { name: "Perkedel Kentang", energyKkal: 126, proteinG: 2.8, fatG: 6.4, carbsG: 14.8, fiberG: 1.3, sodiumMg: 180 },
-  { name: "Bakso Kuah", energyKkal: 110, proteinG: 8.8, fatG: 5.7, carbsG: 5.2, fiberG: 0.4, sodiumMg: 420 },
-  { name: "Soto Ayam", energyKkal: 132, proteinG: 9.1, fatG: 6.9, carbsG: 8.1, fiberG: 0.9, sodiumMg: 460 },
-  { name: "Nasi Goreng Sayur", energyKkal: 188, proteinG: 4.6, fatG: 6.2, carbsG: 28.4, fiberG: 2.3, sodiumMg: 300 },
-  { name: "Bubur Kacang Hijau", energyKkal: 165, proteinG: 5.4, fatG: 3.1, carbsG: 29.0, fiberG: 2.8, sodiumMg: 62 },
+function food(name, category, energyKkal, proteinG, fatG, carbsG, fiberG, sodiumMg) {
+  return { name, category, energyKkal, proteinG, fatG, carbsG, fiberG, sodiumMg };
+}
+
+// 100 bahan dasar (acuan isi piringku: kombinasi karbo, protein, sayur, buah, pelengkap).
+const BASE_INGREDIENT_CATALOG = [
+  // Karbohidrat (20)
+  food("Nasi Putih", "karbo", 175, 3.4, 0.4, 39.8, 0.3, 2),
+  food("Nasi Merah", "karbo", 170, 3.8, 1.0, 35.2, 1.8, 3),
+  food("Nasi Jagung", "karbo", 162, 3.6, 0.9, 34.5, 2.1, 6),
+  food("Nasi Hanjeli", "karbo", 164, 4.0, 1.3, 33.1, 2.8, 5),
+  food("Kentang Rebus", "karbo", 87, 2.0, 0.1, 20.1, 1.8, 7),
+  food("Ubi Jalar Kukus", "karbo", 111, 1.6, 0.1, 26.2, 3.0, 55),
+  food("Singkong Rebus", "karbo", 146, 1.4, 0.3, 34.0, 1.8, 14),
+  food("Talas Kukus", "karbo", 142, 1.5, 0.2, 34.6, 4.1, 11),
+  food("Jagung Rebus", "karbo", 144, 4.1, 1.3, 31.0, 2.9, 15),
+  food("Mie Gandum Rebus", "karbo", 138, 5.6, 1.8, 24.8, 2.3, 120),
+  food("Oatmeal", "karbo", 118, 4.2, 2.3, 21.5, 3.8, 49),
+  food("Roti Gandum", "karbo", 128, 5.1, 2.0, 22.1, 3.2, 215),
+  food("Bubur Beras", "karbo", 84, 1.7, 0.2, 18.8, 0.2, 30),
+  food("Beras Hitam", "karbo", 168, 4.7, 1.5, 34.3, 2.0, 5),
+  food("Sagu", "karbo", 160, 0.2, 0.1, 39.0, 0.5, 1),
+  food("Kwetiau Rebus", "karbo", 150, 2.8, 0.6, 33.0, 1.1, 90),
+  food("Bihun Jagung", "karbo", 148, 2.2, 0.4, 34.7, 1.0, 78),
+  food("Macaroni Rebus", "karbo", 131, 5.0, 1.1, 25.0, 1.3, 6),
+  food("Lontong", "karbo", 137, 2.1, 0.3, 30.8, 0.8, 3),
+  food("Beras Shirataki", "karbo", 35, 0.4, 0.1, 8.4, 2.1, 8),
+
+  // Protein hewani (20)
+  food("Dada Ayam Panggang", "protein_hewani", 165, 31.0, 3.6, 0, 0, 74),
+  food("Paha Ayam Rebus", "protein_hewani", 180, 27.0, 8.0, 0, 0, 88),
+  food("Ikan Kembung", "protein_hewani", 167, 21.4, 8.2, 0, 0, 90),
+  food("Ikan Tuna", "protein_hewani", 145, 23.5, 4.9, 0, 0, 37),
+  food("Ikan Salmon", "protein_hewani", 206, 22.1, 12.4, 0, 0, 59),
+  food("Ikan Lele", "protein_hewani", 152, 18.8, 7.2, 0, 0, 52),
+  food("Ikan Nila", "protein_hewani", 128, 26.2, 2.7, 0, 0, 56),
+  food("Udang Kukus", "protein_hewani", 99, 24.0, 0.3, 0.2, 0, 111),
+  food("Telur Ayam Rebus", "protein_hewani", 78, 6.3, 5.3, 0.6, 0, 62),
+  food("Telur Puyuh Rebus", "protein_hewani", 74, 6.0, 5.0, 0.4, 0, 45),
+  food("Daging Sapi Tanpa Lemak", "protein_hewani", 187, 26.0, 9.0, 0, 0, 55),
+  food("Daging Kambing Tanpa Lemak", "protein_hewani", 170, 25.0, 7.0, 0, 0, 75),
+  food("Hati Ayam", "protein_hewani", 167, 24.5, 5.9, 1.0, 0, 77),
+  food("Ati Sapi", "protein_hewani", 175, 27.0, 6.5, 3.8, 0, 69),
+  food("Sarden", "protein_hewani", 140, 17.0, 7.0, 2.2, 0.3, 330),
+  food("Bandeng", "protein_hewani", 129, 20.0, 4.8, 0, 0, 64),
+  food("Tongkol", "protein_hewani", 135, 24.0, 3.5, 0, 0, 73),
+  food("Kerang Hijau", "protein_hewani", 124, 20.0, 3.2, 4.7, 0.1, 286),
+  food("Cumi Kukus", "protein_hewani", 92, 15.6, 1.4, 3.1, 0, 44),
+  food("Yogurt Yunani Plain", "protein_hewani", 97, 9.0, 4.0, 3.6, 0, 36),
+
+  // Protein nabati (15)
+  food("Tempe", "protein_nabati", 150, 12.0, 7.9, 8.7, 1.4, 9),
+  food("Tahu Putih", "protein_nabati", 80, 8.0, 4.4, 1.5, 0.3, 7),
+  food("Kacang Merah Rebus", "protein_nabati", 127, 8.7, 0.5, 22.8, 6.4, 2),
+  food("Kacang Hitam Rebus", "protein_nabati", 132, 8.9, 0.6, 23.7, 8.7, 1),
+  food("Kacang Hijau Rebus", "protein_nabati", 105, 7.0, 0.5, 19.2, 4.7, 15),
+  food("Kacang Polong Rebus", "protein_nabati", 84, 5.4, 0.4, 15.0, 5.5, 3),
+  food("Edamame Rebus", "protein_nabati", 121, 11.9, 5.2, 8.9, 5.2, 6),
+  food("Oncom", "protein_nabati", 142, 10.5, 7.2, 9.0, 1.0, 8),
+  food("Kacang Tanah Rebus", "protein_nabati", 164, 7.0, 13.0, 5.5, 3.0, 6),
+  food("Selai Kacang Alami", "protein_nabati", 188, 7.1, 16.1, 6.9, 2.4, 75),
+  food("Biji Wijen", "protein_nabati", 180, 5.8, 15.2, 7.7, 3.1, 8),
+  food("Biji Chia", "protein_nabati", 170, 5.7, 10.7, 14.7, 11.2, 6),
+  food("Biji Labu", "protein_nabati", 170, 8.2, 13.5, 4.5, 2.0, 7),
+  food("Lentil Rebus", "protein_nabati", 116, 9.0, 0.4, 20.1, 7.9, 2),
+  food("Kedelai Rebus", "protein_nabati", 173, 16.6, 9.0, 9.9, 6.0, 2),
+
+  // Sayuran (20)
+  food("Bayam", "sayur", 23, 2.9, 0.4, 3.6, 2.2, 79),
+  food("Kangkung", "sayur", 19, 2.6, 0.2, 3.1, 2.1, 45),
+  food("Sawi Hijau", "sayur", 27, 2.9, 0.4, 4.7, 2.5, 65),
+  food("Sawi Putih", "sayur", 16, 1.2, 0.2, 3.2, 1.2, 9),
+  food("Brokoli", "sayur", 34, 2.8, 0.4, 6.6, 2.6, 33),
+  food("Kembang Kol", "sayur", 25, 1.9, 0.3, 5.0, 2.0, 30),
+  food("Wortel", "sayur", 41, 0.9, 0.2, 9.5, 2.7, 69),
+  food("Buncis", "sayur", 31, 1.8, 0.1, 7.0, 2.7, 6),
+  food("Labu Siam", "sayur", 19, 0.8, 0.1, 4.5, 1.7, 2),
+  food("Labu Kuning", "sayur", 45, 1.0, 0.1, 11.7, 2.0, 1),
+  food("Terong", "sayur", 25, 1.0, 0.2, 5.9, 3.0, 2),
+  food("Pare", "sayur", 17, 1.0, 0.2, 3.7, 2.8, 6),
+  food("Tomat", "sayur", 18, 0.9, 0.2, 3.9, 1.2, 5),
+  food("Mentimun", "sayur", 15, 0.7, 0.1, 3.6, 0.5, 2),
+  food("Paprika Merah", "sayur", 31, 1.0, 0.3, 6.0, 2.1, 4),
+  food("Daun Kelor", "sayur", 64, 9.4, 1.4, 8.3, 2.0, 9),
+  food("Kol", "sayur", 25, 1.3, 0.1, 5.8, 2.5, 18),
+  food("Tauge", "sayur", 30, 3.0, 0.2, 6.2, 1.8, 6),
+  food("Daun Singkong", "sayur", 37, 3.7, 1.2, 6.1, 2.5, 7),
+  food("Oyong", "sayur", 20, 0.9, 0.2, 4.3, 1.5, 4),
+
+  // Buah (15)
+  food("Pisang", "buah", 105, 1.3, 0.4, 27.0, 3.1, 1),
+  food("Pepaya", "buah", 55, 0.9, 0.3, 14.0, 2.5, 8),
+  food("Jeruk", "buah", 62, 1.2, 0.2, 15.4, 3.1, 0),
+  food("Apel", "buah", 80, 0.3, 0.2, 21.0, 3.8, 2),
+  food("Pir", "buah", 57, 0.4, 0.1, 15.2, 3.1, 1),
+  food("Semangka", "buah", 30, 0.6, 0.2, 7.6, 0.4, 1),
+  food("Melon", "buah", 34, 0.8, 0.2, 8.2, 0.9, 16),
+  food("Mangga", "buah", 60, 0.8, 0.4, 15.0, 1.6, 1),
+  food("Nanas", "buah", 50, 0.5, 0.1, 13.1, 1.4, 1),
+  food("Jambu Biji", "buah", 68, 2.6, 1.0, 14.3, 5.4, 2),
+  food("Alpukat", "buah", 160, 2.0, 14.7, 8.5, 6.7, 7),
+  food("Salak", "buah", 82, 0.4, 0.4, 22.8, 2.6, 5),
+  food("Naga Merah", "buah", 57, 1.2, 0.4, 13.0, 3.0, 2),
+  food("Anggur", "buah", 69, 0.7, 0.2, 18.1, 0.9, 2),
+  food("Kurma", "buah", 133, 1.1, 0.2, 35.0, 3.2, 2),
+
+  // Pelengkap (10)
+  food("Susu UHT Rendah Lemak", "pelengkap", 90, 6.0, 3.0, 9.0, 0, 85),
+  food("Yogurt Plain", "pelengkap", 95, 5.2, 3.3, 11.5, 0, 50),
+  food("Keju Rendah Lemak", "pelengkap", 98, 6.2, 7.1, 1.4, 0, 180),
+  food("Minyak Zaitun", "pelengkap", 119, 0, 13.5, 0, 0, 0),
+  food("Minyak Kanola", "pelengkap", 120, 0, 13.6, 0, 0, 0),
+  food("Kacang Almond", "pelengkap", 164, 6.0, 14.2, 6.1, 3.5, 0),
+  food("Kacang Mete", "pelengkap", 157, 5.2, 12.4, 8.6, 1.0, 3),
+  food("Biji Bunga Matahari", "pelengkap", 163, 5.5, 14.1, 6.8, 2.8, 2),
+  food("Wijen Sangrai", "pelengkap", 172, 5.6, 14.8, 7.0, 2.7, 6),
+  food("Madu Murni", "pelengkap", 64, 0.1, 0, 17.3, 0.1, 1),
 ];
+
+const INGREDIENT_BY_CATEGORY = BASE_INGREDIENT_CATALOG.reduce((acc, item) => {
+  const key = item.category;
+  if (!acc[key]) acc[key] = [];
+  acc[key].push(item);
+  return acc;
+}, {});
 
 function randInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -79,21 +170,41 @@ function round2(v) {
   return Math.round(v * 100) / 100;
 }
 
+function withPortion(item, grams) {
+  const ratio = grams / 100;
+  return {
+    name: item.name,
+    grams: round2(grams),
+    energyKkal: round2(item.energyKkal * ratio),
+    proteinG: round2(item.proteinG * ratio),
+    fatG: round2(item.fatG * ratio),
+    carbsG: round2(item.carbsG * ratio),
+    fiberG: round2(item.fiberG * ratio),
+    sodiumMg: round2(item.sodiumMg * ratio),
+  };
+}
+
 function createMenuTemplate(index) {
-  const itemCount = randInt(3, 7);
-  const picked = sampleWithoutReplacement(MENU_FOOD_CATALOG, itemCount);
-  const items = picked.map((item) => {
-    const factor = randFloat(0.8, 1.3);
-    return {
-      name: item.name,
-      energyKkal: round2(item.energyKkal * factor),
-      proteinG: round2(item.proteinG * factor),
-      fatG: round2(item.fatG * factor),
-      carbsG: round2(item.carbsG * factor),
-      fiberG: round2(item.fiberG * factor),
-      sodiumMg: round2(item.sodiumMg * factor),
-    };
-  });
+  // Acuan Isi Piringku: 50% sayur+buah, 50% karbo+protein.
+  const carb = INGREDIENT_BY_CATEGORY.karbo[randInt(0, INGREDIENT_BY_CATEGORY.karbo.length - 1)];
+  const proteinAnimal = INGREDIENT_BY_CATEGORY.protein_hewani[randInt(0, INGREDIENT_BY_CATEGORY.protein_hewani.length - 1)];
+  const proteinPlant = INGREDIENT_BY_CATEGORY.protein_nabati[randInt(0, INGREDIENT_BY_CATEGORY.protein_nabati.length - 1)];
+  const vegCount = randInt(1, 2);
+  const vegItems = sampleWithoutReplacement(INGREDIENT_BY_CATEGORY.sayur, vegCount);
+  const fruit = INGREDIENT_BY_CATEGORY.buah[randInt(0, INGREDIENT_BY_CATEGORY.buah.length - 1)];
+  const extra = Math.random() < 0.75
+    ? INGREDIENT_BY_CATEGORY.pelengkap[randInt(0, INGREDIENT_BY_CATEGORY.pelengkap.length - 1)]
+    : null;
+
+  const items = [
+    withPortion(carb, randInt(100, 170)),
+    withPortion(proteinAnimal, randInt(45, 90)),
+    withPortion(proteinPlant, randInt(35, 80)),
+    ...vegItems.map((v) => withPortion(v, randInt(50, 110))),
+    withPortion(fruit, randInt(60, 130)),
+  ];
+  if (extra) items.push(withPortion(extra, randInt(10, 40)));
+
   const total = items.reduce(
     (acc, cur) => {
       acc.energyKkal += cur.energyKkal;
@@ -108,7 +219,7 @@ function createMenuTemplate(index) {
   );
   return {
     code: "MENU-" + String(index + 1).padStart(4, "0"),
-    title: items.map((x) => x.name).slice(0, 3).join(" + "),
+    title: items.map((x) => x.name).slice(0, 4).join(" + "),
     items,
     totalNutrition: {
       energyKkal: round2(total.energyKkal),
@@ -299,9 +410,11 @@ async function runDailyDummyNutrition(options = {}) {
   const runDate = now.startOf("day").toDate();
   const generatedAt = now.toDate();
   const menuPool = buildMenuPool(totalMenus);
-  const weekKey = now.startOf("week").format("YYYY-[W]WW");
-  const weekdayIdx = weekdayIndexFromDate(runDate);
-  const weekdayKey = WEEKDAY_KEYS[weekdayIdx];
+  const dateSlices = [
+    { key: "kemarin", date: now.subtract(1, "day").startOf("day").toDate() },
+    { key: "hari_ini", date: runDate },
+    { key: "besok", date: now.add(1, "day").startOf("day").toDate() },
+  ];
 
   return withJobLock(async () => {
     const [sppgs, recipients, operators, fallbackPetugas] = await Promise.all([
@@ -343,109 +456,106 @@ async function runDailyDummyNutrition(options = {}) {
       recipientBySppg.set(rec.sppgId, arr);
     }
 
-    const sppgPool = sppgs.filter((s) => (recipientBySppg.get(s.id) || []).length > 0);
-    const dailyTotalPortions = Number.isFinite(explicitTotalRecords) && explicitTotalRecords > 0
-      ? Math.max(50, Math.min(100000, Math.round(explicitTotalRecords)))
-      : computeDailyTotalPortionsFromCapacity(sppgPool);
-    const allocation = distributeByCapacity(sppgPool, dailyTotalPortions);
+    const sppgPool = sppgs;
     const pemantauanRows = [];
-    const distribusiAgg = new Map();
-
-    const dailyMenusBySppg = new Map();
-    for (const s of sppgPool) {
-      const weeklyPlan = buildWeeklyMenuPlanForSppg(s.id, weekKey, menuPool);
-      const todayPlan = weeklyPlan[weekdayKey];
-      dailyMenusBySppg.set(s.id, { weeklyPlan, todayPlan });
-    }
-
-    for (const sppg of sppgPool) {
-      const recPool = recipientBySppg.get(sppg.id);
-      const target = allocation.get(sppg.id) || 0;
-      const daily = dailyMenusBySppg.get(sppg.id);
-      if (!target || !daily || !daily.todayPlan || !daily.todayPlan.menus.length) continue;
-      for (let i = 0; i < target; i++) {
-        const recipient = recPool[randInt(0, recPool.length - 1)];
-        const menuLite = daily.todayPlan.menus[i % daily.todayPlan.menus.length];
-        const menu =
-          menuPool.find((m) => m.code === menuLite.code) ||
-          menuPool[randInt(0, menuPool.length - 1)];
-
-        const anthropo = estimateAnthropometry(recipient, menu);
-        const z = hitungZScore({
-          beratBadanKg: anthropo.beratBadanKg,
-          tinggiBadanCm: anthropo.tinggiBadanCm,
-          usiaBulan: anthropo.usiaBulan,
-          jenisKelamin: recipient.jenisKelamin,
-        });
-        const klas = klasifikasiStatusGizi(z);
-        const preferred = chooseStatusFromMenu(menu);
-        const statusGizi = klas.statusGizi === "GIZI_BAIK" ? preferred : klas.statusGizi;
-
-        const petugasId = operatorBySppg.get(sppg.id) || fallbackPetugasId;
-        pemantauanRows.push({
-          penerimaId: recipient.id,
-          tanggalPengukuran: runDate,
-          beratBadanKg: anthropo.beratBadanKg,
-          tinggiBadanCm: anthropo.tinggiBadanCm,
-          lilaCm: anthropo.lilaCm,
-          usiaBulan: anthropo.usiaBulan,
-          zscoreBbU: z.zscoreBbU,
-          zscoreTbU: z.zscoreTbU,
-          zscoreBbTb: z.zscoreBbTb,
-          statusGizi,
-          stunting: klas.stunting,
-          petugasId,
-          catatan:
-            anthropo.catatan +
-            " Nutrisi total: " +
-            JSON.stringify(menu.totalNutrition) +
-            ". Menu: " +
-            menu.items.map((x) => x.name).join(", "),
-        });
-
-        const agg = distribusiAgg.get(sppg.id) || {
-          sppg,
-          porsiPesertaDidik: 0,
-          porsiBalita: 0,
-          porsiIbuHamil: 0,
-          porsiIbuMenyusui: 0,
-          menuSamples: [],
-          totalEnergy: 0,
-          weeklyPlan: daily.weeklyPlan,
-          todayPlan: daily.todayPlan,
-        };
-        if (recipient.kategori === "PESERTA_DIDIK") agg.porsiPesertaDidik += 1;
-        else if (recipient.kategori === "BALITA") agg.porsiBalita += 1;
-        else if (recipient.kategori === "IBU_HAMIL") agg.porsiIbuHamil += 1;
-        else agg.porsiIbuMenyusui += 1;
-        agg.totalEnergy += menu.totalNutrition.energyKkal;
-        if (agg.menuSamples.length < 10) agg.menuSamples.push(menu);
-        distribusiAgg.set(sppg.id, agg);
-      }
-    }
-
     const upsertDistribusi = [];
-    for (const [sppgId, agg] of distribusiAgg.entries()) {
-      const totalPorsi =
-        agg.porsiPesertaDidik +
-        agg.porsiBalita +
-        agg.porsiIbuHamil +
-        agg.porsiIbuMenyusui;
-      const kapasitas = Math.max(1, agg.sppg.kapasitasPorsiPerHari || 1);
-      const realisasiPersen = round2((totalPorsi / kapasitas) * 100);
-      upsertDistribusi.push(
-        prisma.distribusiMbg.upsert({
-          where: {
-            sppgId_tanggalDistribusi: {
-              sppgId,
-              tanggalDistribusi: runDate,
+    const totalPortionsBySlice = {};
+    const weekKeys = new Set();
+
+    for (const slice of dateSlices) {
+      const weekKey = dayjs(slice.date).tz(TZ).startOf("week").format("YYYY-[W]WW");
+      weekKeys.add(weekKey);
+      const weekdayIdx = weekdayIndexFromDate(slice.date);
+      const weekdayKey = WEEKDAY_KEYS[weekdayIdx];
+      const dailyTotalPortions = Number.isFinite(explicitTotalRecords) && explicitTotalRecords > 0
+        ? Math.max(50, Math.min(100000, Math.round(explicitTotalRecords)))
+        : computeDailyTotalPortionsFromCapacity(sppgPool);
+      totalPortionsBySlice[slice.key] = dailyTotalPortions;
+      const allocation = distributeByCapacity(sppgPool, dailyTotalPortions);
+
+      for (const sppg of sppgPool) {
+        const recPool = recipientBySppg.get(sppg.id) || [];
+        const target = Math.max(1, allocation.get(sppg.id) || 1);
+        const weeklyPlan = buildWeeklyMenuPlanForSppg(sppg.id, weekKey, menuPool);
+        const todayPlan = weeklyPlan[weekdayKey];
+        const menuSamples = [];
+        let totalEnergy = 0;
+        let porsiPesertaDidik = 0;
+        let porsiBalita = 0;
+        let porsiIbuHamil = 0;
+        let porsiIbuMenyusui = 0;
+
+        const pemantauanTarget = recPool.length ? Math.min(15, Math.max(1, Math.round(target * 0.25))) : 0;
+        for (let i = 0; i < pemantauanTarget; i++) {
+          const recipient = recPool[randInt(0, recPool.length - 1)];
+          const menuLite = todayPlan.menus[i % todayPlan.menus.length];
+          const menu = menuPool.find((m) => m.code === menuLite.code) || menuPool[randInt(0, menuPool.length - 1)];
+          const anthropo = estimateAnthropometry(recipient, menu);
+          const z = hitungZScore({
+            beratBadanKg: anthropo.beratBadanKg,
+            tinggiBadanCm: anthropo.tinggiBadanCm,
+            usiaBulan: anthropo.usiaBulan,
+            jenisKelamin: recipient.jenisKelamin,
+          });
+          const klas = klasifikasiStatusGizi(z);
+          const preferred = chooseStatusFromMenu(menu);
+          const statusGizi = klas.statusGizi === "GIZI_BAIK" ? preferred : klas.statusGizi;
+          const petugasId = operatorBySppg.get(sppg.id) || fallbackPetugasId;
+          pemantauanRows.push({
+            penerimaId: recipient.id,
+            tanggalPengukuran: slice.date,
+            beratBadanKg: anthropo.beratBadanKg,
+            tinggiBadanCm: anthropo.tinggiBadanCm,
+            lilaCm: anthropo.lilaCm,
+            usiaBulan: anthropo.usiaBulan,
+            zscoreBbU: z.zscoreBbU,
+            zscoreTbU: z.zscoreTbU,
+            zscoreBbTb: z.zscoreBbTb,
+            statusGizi,
+            stunting: klas.stunting,
+            petugasId,
+            catatan:
+              anthropo.catatan +
+              " Nutrisi total: " +
+              JSON.stringify(menu.totalNutrition) +
+              ". Menu: " +
+              menu.items.map((x) => x.name).join(", "),
+          });
+        }
+
+        for (let i = 0; i < target; i++) {
+          const menuLite = todayPlan.menus[i % todayPlan.menus.length];
+          const menu = menuPool.find((m) => m.code === menuLite.code) || menuPool[randInt(0, menuPool.length - 1)];
+          totalEnergy += menu.totalNutrition.energyKkal;
+          if (menuSamples.length < 10) menuSamples.push(menu);
+          if (recPool.length) {
+            const rc = recPool[randInt(0, recPool.length - 1)];
+            if (rc.kategori === "PESERTA_DIDIK") porsiPesertaDidik += 1;
+            else if (rc.kategori === "BALITA") porsiBalita += 1;
+            else if (rc.kategori === "IBU_HAMIL") porsiIbuHamil += 1;
+            else porsiIbuMenyusui += 1;
+          } else {
+            porsiPesertaDidik += 1;
+          }
+        }
+
+        const totalPorsi =
+          porsiPesertaDidik + porsiBalita + porsiIbuHamil + porsiIbuMenyusui;
+        const kapasitas = Math.max(1, sppg.kapasitasPorsiPerHari || 1);
+        const realisasiPersen = round2((totalPorsi / kapasitas) * 100);
+        upsertDistribusi.push(
+          prisma.distribusiMbg.upsert({
+            where: {
+              sppgId_tanggalDistribusi: {
+                sppgId: sppg.id,
+                tanggalDistribusi: slice.date,
+              },
             },
-          },
           update: {
-            porsiPesertaDidik: agg.porsiPesertaDidik,
-            porsiBalita: agg.porsiBalita,
-            porsiIbuHamil: agg.porsiIbuHamil,
-            porsiIbuMenyusui: agg.porsiIbuMenyusui,
+            porsiPesertaDidik,
+            porsiBalita,
+            porsiIbuHamil,
+            porsiIbuMenyusui,
             totalPorsi,
             status: "TERVALIDASI",
             catatan: JSON.stringify({
@@ -454,28 +564,29 @@ async function runDailyDummyNutrition(options = {}) {
               realisasiPersen,
               totalMenuGenerated: totalMenus,
               totalPorsiGenerated: dailyTotalPortions,
+              sliceKey: slice.key,
               weekdayKey,
-              menuHarian: agg.todayPlan,
-              menuMingguan: agg.weeklyPlan,
-              menuHarianSampel: agg.menuSamples.map((m) => ({
+              menuHarian: todayPlan,
+              menuMingguan: weeklyPlan,
+              menuHarianSampel: menuSamples.map((m) => ({
                 code: m.code,
                 title: m.title,
                 itemCount: m.items.length,
                 totalNutrition: m.totalNutrition,
               })),
-              averageEnergyPerPortion: round2(agg.totalEnergy / Math.max(1, totalPorsi)),
+              averageEnergyPerPortion: round2(totalEnergy / Math.max(1, totalPorsi)),
             }),
           },
           create: {
-            sppgId,
-            tanggalDistribusi: runDate,
-            porsiPesertaDidik: agg.porsiPesertaDidik,
-            porsiBalita: agg.porsiBalita,
-            porsiIbuHamil: agg.porsiIbuHamil,
-            porsiIbuMenyusui: agg.porsiIbuMenyusui,
+              sppgId: sppg.id,
+              tanggalDistribusi: slice.date,
+            porsiPesertaDidik,
+            porsiBalita,
+            porsiIbuHamil,
+            porsiIbuMenyusui,
             totalPorsi,
             status: "TERVALIDASI",
-            operatorId: operatorBySppg.get(sppgId) || fallbackPetugasId,
+            operatorId: operatorBySppg.get(sppg.id) || fallbackPetugasId,
             validatorId: fallbackPetugasId,
             catatan: JSON.stringify({
               source: "dummy-nutrition-generator",
@@ -483,20 +594,22 @@ async function runDailyDummyNutrition(options = {}) {
               realisasiPersen,
               totalMenuGenerated: totalMenus,
               totalPorsiGenerated: dailyTotalPortions,
+              sliceKey: slice.key,
               weekdayKey,
-              menuHarian: agg.todayPlan,
-              menuMingguan: agg.weeklyPlan,
-              menuHarianSampel: agg.menuSamples.map((m) => ({
+              menuHarian: todayPlan,
+              menuMingguan: weeklyPlan,
+              menuHarianSampel: menuSamples.map((m) => ({
                 code: m.code,
                 title: m.title,
                 itemCount: m.items.length,
                 totalNutrition: m.totalNutrition,
               })),
-              averageEnergyPerPortion: round2(agg.totalEnergy / Math.max(1, totalPorsi)),
+              averageEnergyPerPortion: round2(totalEnergy / Math.max(1, totalPorsi)),
             }),
-          },
-        })
-      );
+            },
+          })
+        );
+      }
     }
 
     await prisma.$transaction(upsertDistribusi, { timeout: 60_000 });
@@ -517,7 +630,7 @@ async function runDailyDummyNutrition(options = {}) {
         notes:
           "Generator dummy harian: " +
           totalMenus +
-          " menu unik acak + pemantauan gizi, disebar berbobot kapasitas ke SPPG aktif.",
+          " menu unik acak + pemantauan gizi, disebar berbobot kapasitas ke SPPG aktif pada kemarin/hari_ini/besok.",
       },
     });
 
@@ -527,11 +640,14 @@ async function runDailyDummyNutrition(options = {}) {
       generatedAt: generatedAt.toISOString(),
       totalMenuPool: menuPool.length,
       totalUniqueMenus: totalMenus,
-      totalPorsiGenerated: dailyTotalPortions,
+      baseIngredientCount: BASE_INGREDIENT_CATALOG.length,
+      totalPorsiGenerated: totalPortionsBySlice.hari_ini || 0,
+      totalPorsiKemarin: totalPortionsBySlice.kemarin || 0,
+      totalPorsiBesok: totalPortionsBySlice.besok || 0,
       totalPemantauanInserted: pemantauanRows.length,
-      totalSppgUpdated: distribusiAgg.size,
-      weekdayKey,
-      weekKey,
+      totalSppgUpdated: sppgPool.length,
+      daysGenerated: ["kemarin", "hari_ini", "besok"],
+      weekKeys: Array.from(weekKeys),
     };
   });
 }
