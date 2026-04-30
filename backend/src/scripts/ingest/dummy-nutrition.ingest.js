@@ -8,7 +8,7 @@ const { runDailyDummyNutrition } = require("../../services/dummyNutrition.servic
 const { prisma } = require("../../config/database");
 
 async function main() {
-  const result = await runDailyDummyNutrition({ trigger: "cron", totalRecords: 1000 });
+  const result = await runDailyDummyNutrition({ trigger: "cron", totalMenus: 1000 });
   console.log("[dummy-nutrition] result:", JSON.stringify(result));
 }
 

@@ -224,6 +224,14 @@ function distributeByCapacity(sppgs, totalRecords) {
   return map;
 }
 
+function computeDailyTotalPortionsFromCapacity(sppgs) {
+  const totalCapacity = sppgs.reduce((sum, s) => sum + Math.max(1, Number(s.kapasitasPorsiPerHari || 1)), 0);
+  if (totalCapacity <= 0) return 1000;
+  // Utilisasi harian 35% - 90% dari total kapasitas agar tetap random tapi realistis.
+  const ratio = randFloat(0.35, 0.9);
+  return Math.max(200, Math.round(totalCapacity * ratio));
+}
+
 function estimateAnthropometry(recipient, menu) {
   const kategori = recipient.kategori;
   if (kategori === "BALITA") {
@@ -285,11 +293,12 @@ async function withJobLock(fn) {
 
 async function runDailyDummyNutrition(options = {}) {
   const trigger = options.trigger || "cron";
-  const totalRecords = Math.max(50, Math.min(5000, Number(options.totalRecords) || 1000));
+  const totalMenus = Math.max(1000, Math.min(10000, Number(options.totalMenus) || 1000));
+  const explicitTotalRecords = Number(options.totalRecords);
   const now = dayjs().tz(TZ);
   const runDate = now.startOf("day").toDate();
   const generatedAt = now.toDate();
-  const menuPool = buildMenuPool(Math.max(1200, totalRecords));
+  const menuPool = buildMenuPool(totalMenus);
   const weekKey = now.startOf("week").format("YYYY-[W]WW");
   const weekdayIdx = weekdayIndexFromDate(runDate);
   const weekdayKey = WEEKDAY_KEYS[weekdayIdx];
@@ -335,7 +344,10 @@ async function runDailyDummyNutrition(options = {}) {
     }
 
     const sppgPool = sppgs.filter((s) => (recipientBySppg.get(s.id) || []).length > 0);
-    const allocation = distributeByCapacity(sppgPool, totalRecords);
+    const dailyTotalPortions = Number.isFinite(explicitTotalRecords) && explicitTotalRecords > 0
+      ? Math.max(50, Math.min(100000, Math.round(explicitTotalRecords)))
+      : computeDailyTotalPortionsFromCapacity(sppgPool);
+    const allocation = distributeByCapacity(sppgPool, dailyTotalPortions);
     const pemantauanRows = [];
     const distribusiAgg = new Map();
 
@@ -440,7 +452,8 @@ async function runDailyDummyNutrition(options = {}) {
               source: "dummy-nutrition-generator",
               generatedAt: generatedAt.toISOString(),
               realisasiPersen,
-              totalMenuGenerated: totalRecords,
+              totalMenuGenerated: totalMenus,
+              totalPorsiGenerated: dailyTotalPortions,
               weekdayKey,
               menuHarian: agg.todayPlan,
               menuMingguan: agg.weeklyPlan,
@@ -468,7 +481,8 @@ async function runDailyDummyNutrition(options = {}) {
               source: "dummy-nutrition-generator",
               generatedAt: generatedAt.toISOString(),
               realisasiPersen,
-              totalMenuGenerated: totalRecords,
+              totalMenuGenerated: totalMenus,
+              totalPorsiGenerated: dailyTotalPortions,
               weekdayKey,
               menuHarian: agg.todayPlan,
               menuMingguan: agg.weeklyPlan,
@@ -502,8 +516,8 @@ async function runDailyDummyNutrition(options = {}) {
         totalRecords: pemantauanRows.length,
         notes:
           "Generator dummy harian: " +
-          totalRecords +
-          " menu acak + pemantauan gizi, disebar berbobot kapasitas ke SPPG aktif.",
+          totalMenus +
+          " menu unik acak + pemantauan gizi, disebar berbobot kapasitas ke SPPG aktif.",
       },
     });
 
@@ -512,6 +526,8 @@ async function runDailyDummyNutrition(options = {}) {
       trigger,
       generatedAt: generatedAt.toISOString(),
       totalMenuPool: menuPool.length,
+      totalUniqueMenus: totalMenus,
+      totalPorsiGenerated: dailyTotalPortions,
       totalPemantauanInserted: pemantauanRows.length,
       totalSppgUpdated: distribusiAgg.size,
       weekdayKey,
