@@ -462,19 +462,32 @@ async function runDailyDummyNutrition(options = {}) {
   // Vercel Cron path: turunkan default totalMenus ke 500 agar < 5 menit.
   // Trigger manual (klik tombol admin) tetap boleh 1000 sesuai UX awal.
   const isVercelCron = trigger === "vercel_cron" || trigger === "manual_cron";
-  const defaultMenus = isVercelCron ? 500 : 1000;
+  const isBackfill = String(trigger).indexOf("backfill") >= 0;
+  const defaultMenus = isVercelCron || isBackfill ? 500 : 1000;
   const totalMenus = Math.max(100, Math.min(10000, Number(options.totalMenus) || defaultMenus));
   const explicitTotalRecords = Number(options.totalRecords);
   const now = dayjs().tz(TZ);
   const runDate = now.startOf("day").toDate();
   const generatedAt = now.toDate();
   const menuPool = buildMenuPool(totalMenus);
-  const dateSlices = [
-    { key: "kemarin", date: now.subtract(1, "day").startOf("day").toDate() },
-    { key: "hari_ini", date: runDate },
-    { key: "besok", date: now.add(1, "day").startOf("day").toDate() },
-  ];
-  const lockOptions = { skipLock: isVercelCron || options.skipLock === true };
+  // Default 3 slice (kemarin / hari ini / besok). Untuk backfill, generate
+  // N hari ke belakang (default 30) agar tren dashboard tidak ada hari kosong.
+  const backfillDays = Math.max(0, Math.min(60, parseInt(options.backfillDays, 10) || 0));
+  const dateSlices = [];
+  if (backfillDays > 0) {
+    for (let d = backfillDays; d >= -1; d--) {
+      const date = now.subtract(d, "day").startOf("day").toDate();
+      const key = d === 1 ? "kemarin" : d === 0 ? "hari_ini" : d === -1 ? "besok" : "h" + d;
+      dateSlices.push({ key, date });
+    }
+  } else {
+    dateSlices.push(
+      { key: "kemarin", date: now.subtract(1, "day").startOf("day").toDate() },
+      { key: "hari_ini", date: runDate },
+      { key: "besok", date: now.add(1, "day").startOf("day").toDate() }
+    );
+  }
+  const lockOptions = { skipLock: isVercelCron || isBackfill || options.skipLock === true };
 
   return withJobLock(async () => {
     const [sppgs, recipients, operators, fallbackPetugas] = await Promise.all([

@@ -11,4 +11,10 @@ const ctrl = require("../controllers/cron.controller");
 router.get("/daily-generate", ctrl.dailyGenerate);
 router.post("/daily-generate", ctrl.dailyGenerate);
 
+// Backfill SPPG (kapasitas realistis + penerima dummy) - admin/PEJABAT via UI
+router.post("/backfill-sppg", ctrl.backfillSppg);
+
+// Backfill 30 hari distribusi + realtime + public - admin/PEJABAT via UI
+router.post("/backfill-30d", ctrl.backfill30d);
+
 module.exports = router;

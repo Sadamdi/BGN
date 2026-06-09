@@ -95,6 +95,8 @@ export default function DashboardPage() {
   const [syncLoading, setSyncLoading] = useState(false);
   const [syncDummyLoading, setSyncDummyLoading] = useState(false);
   const [syncCronLoading, setSyncCronLoading] = useState(false);
+  const [backfillSppgLoading, setBackfillSppgLoading] = useState(false);
+  const [backfill30dLoading, setBackfill30dLoading] = useState(false);
   const [lastSyncSummary, setLastSyncSummary] = useState(null);
 
   const fetchAll = async () => {
@@ -255,6 +257,57 @@ export default function DashboardPage() {
     }
   };
 
+  const onBackfillSppg = async () => {
+    setBackfillSppgLoading(true);
+    setError(null);
+    try {
+      const r = await publicDataApi.backfillSppg();
+      const data = r && r.data;
+      if (data) {
+        setLastSyncSummary({
+          jenis: "sppg_backfill",
+          ok: data.ok,
+          totalMs: data.totalMs,
+          steps: data.steps,
+          trigger: data.trigger,
+        });
+      }
+      await fetchAll();
+    } catch (err) {
+      const code = err.response && err.response.status;
+      const msg = (err.response && err.response.data && err.response.data.message) || "Backfill SPPG gagal";
+      setError(code === 401 || code === 403 ? msg + " (perlu login ulang?)" : msg);
+    } finally {
+      setBackfillSppgLoading(false);
+    }
+  };
+
+  const onBackfill30d = async () => {
+    setBackfill30dLoading(true);
+    setError(null);
+    try {
+      const r = await publicDataApi.backfill30d(30);
+      const data = r && r.data;
+      if (data) {
+        setLastSyncSummary({
+          jenis: "backfill_30d",
+          ok: data.ok,
+          backfillDays: data.backfillDays,
+          totalMs: data.totalMs,
+          steps: data.steps,
+          trigger: data.trigger,
+        });
+      }
+      await fetchAll();
+    } catch (err) {
+      const code = err.response && err.response.status;
+      const msg = (err.response && err.response.data && err.response.data.message) || "Backfill 30 hari gagal";
+      setError(code === 401 || code === 403 ? msg + " (perlu login ulang?)" : msg);
+    } finally {
+      setBackfill30dLoading(false);
+    }
+  };
+
   return (
     <div ref={containerRef}>
       <PageHeader
@@ -290,6 +343,22 @@ export default function DashboardPage() {
                   loading={syncCronLoading}
                 >
                   Trigger Cron (Semua)
+                </Button>
+                <Button
+                  icon={<SyncOutlined spin={backfillSppgLoading} />}
+                  onClick={onBackfillSppg}
+                  loading={backfillSppgLoading}
+                >
+                  Backfill SPPG
+                </Button>
+                <Button
+                  type="primary"
+                  ghost
+                  icon={<SyncOutlined spin={backfill30dLoading} />}
+                  onClick={onBackfill30d}
+                  loading={backfill30dLoading}
+                >
+                  Backfill 30 Hari
                 </Button>
               </>
             ) : null}

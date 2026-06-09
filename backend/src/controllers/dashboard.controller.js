@@ -132,7 +132,9 @@ async function getSebaranSppg(req, res, next) {
     const user = req.user;
     const filterSppg = buildSppgFilter(user);
     const data = await getOrSet(cacheKey("dashboard:sebaran", user), 300, async () => {
-      const yest = startOfDay(dayjs().subtract(1, "day").toDate());
+      // Window 2 hari (UTC + Jakarta) untuk toleransi timezone Vercel region iad1.
+      const yestUtc = startOfDay(dayjs().subtract(1, "day").toDate());
+      const yestJakarta = startOfDay(dayjs().subtract(1, "day").tz("Asia/Jakarta").toDate());
       const sppgs = await prisma.sppg.findMany({
         where: {
           ...(filterSppg.sppgId ? { id: filterSppg.sppgId } : {}),
@@ -144,10 +146,18 @@ async function getSebaranSppg(req, res, next) {
       });
       const ids = sppgs.map((s) => s.id);
       const dists = await prisma.distribusiMbg.findMany({
-        where: { sppgId: { in: ids }, tanggalDistribusi: yest },
+        where: {
+          sppgId: { in: ids },
+          OR: [{ tanggalDistribusi: yestUtc }, { tanggalDistribusi: yestJakarta }],
+        },
         select: { sppgId: true, totalPorsi: true },
       });
-      const distMap = new Map(dists.map((d) => [d.sppgId, d.totalPorsi]));
+      // Map per SPPG: kalau ada duplikat (UTC vs WIB), ambil yang terbesar.
+      const distMap = new Map();
+      for (const d of dists) {
+        const cur = distMap.get(d.sppgId);
+        if (!cur || d.totalPorsi > cur) distMap.set(d.sppgId, d.totalPorsi);
+      }
       return sppgs.map((s) => ({
         id: s.id,
         kodeSppg: s.kodeSppg,
