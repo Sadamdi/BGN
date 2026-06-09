@@ -385,12 +385,21 @@ function buildCategoryAllocation(sppg, date, total) {
   return floors;
 }
 
-function computeDailyTotalPortionsFromCapacity(sppgs) {
+function computeDailyTotalPortionsFromCapacity(sppgs, mode) {
   const totalCapacity = sppgs.reduce((sum, s) => sum + Math.max(1, Number(s.kapasitasPorsiPerHari || 1)), 0);
   if (totalCapacity <= 0) return 1000;
-  // Utilisasi harian 35% - 90% dari total kapasitas agar tetap random tapi realistis.
-  const ratio = randFloat(0.35, 0.9);
-  return Math.max(200, Math.round(totalCapacity * ratio));
+  if (mode === "absurdly_high") {
+    // Mode demo: chart besar, util 35% - 90% kapasitas nasional.
+    // Dipakai oleh tombol "Trigger Cron (Semua)" di UI untuk visualisasi dashboard.
+    const ratio = randFloat(0.35, 0.9);
+    return Math.max(200, Math.round(totalCapacity * ratio));
+  }
+  // Mode realistic (default cron harian): nasional 1.000 - 1.000.000 porsi/hari
+  // (util < 1% dari total kapasitas, terdistribusi proporsional ke kapasitas SPPG).
+  // 3.354 SPPG x 100-300 rata-rata -> 335k - 1jt/hari, masuk akal.
+  const minTarget = 1000;
+  const maxTarget = 1000000;
+  return minTarget + Math.floor(Math.random() * (maxTarget - minTarget));
 }
 
 function estimateAnthropometry(recipient, menu) {
@@ -542,7 +551,7 @@ async function runDailyDummyNutrition(options = {}) {
       const weekdayKey = WEEKDAY_KEYS[weekdayIdx];
       const dailyTotalPortions = Number.isFinite(explicitTotalRecords) && explicitTotalRecords > 0
         ? Math.max(50, Math.min(100000, Math.round(explicitTotalRecords)))
-        : computeDailyTotalPortionsFromCapacity(sppgPool);
+        : computeDailyTotalPortionsFromCapacity(sppgPool, options.mode);
       totalPortionsBySlice[slice.key] = dailyTotalPortions;
       const allocation = distributeByCapacity(sppgPool, dailyTotalPortions);
 

@@ -14,5 +14,6 @@ router.use("/pengguna", require("./pengguna.routes"));
 router.use("/notifikasi", require("./notifikasi.routes"));
 router.use("/public-data", require("./publicData.routes"));
 router.use("/cron", require("./cron.routes"));
+router.use("/admin", require("./admin.routes"));
 
 module.exports = router;

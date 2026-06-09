@@ -97,6 +97,8 @@ export default function DashboardPage() {
   const [syncCronLoading, setSyncCronLoading] = useState(false);
   const [backfillSppgLoading, setBackfillSppgLoading] = useState(false);
   const [backfill30dLoading, setBackfill30dLoading] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
+  const [backfillRealisticLoading, setBackfillRealisticLoading] = useState(false);
   const [lastSyncSummary, setLastSyncSummary] = useState(null);
 
   const fetchAll = async () => {
@@ -308,6 +310,67 @@ export default function DashboardPage() {
     }
   };
 
+  const onReset = async () => {
+    // Double confirm: butuh klik 2x
+    if (!window.confirm("PERINGATAN: Tindakan ini akan menghapus SEMUA data dummy (distribusi, pemantauan, realtime metric). Data master (penerima, SPPG, pengguna) TIDAK dihapus. Lanjutkan?")) return;
+    if (!window.confirm("Konfirmasi kedua: Anda YAKIN ingin reset? Tindakan ini tidak dapat dibatalkan.")) return;
+    setResetLoading(true);
+    setError(null);
+    try {
+      const r = await publicDataApi.resetDistribusi("all");
+      const data = r && r.data;
+      setLastSyncSummary({
+        jenis: "reset",
+        ok: data.ok,
+        mode: data.mode,
+        totalMs: data.totalMs,
+        steps: data.steps,
+        trigger: data.trigger,
+      });
+      // Setelah reset, langsung populate data baru dengan mode realistic
+      message.success("Reset selesai. Memulai backfill realistic 30 hari...");
+      const r2 = await publicDataApi.backfillRealistic(30);
+      const d2 = r2 && r2.data;
+      setLastSyncSummary((prev) => ({
+        ...(prev || {}),
+        backfill: { ok: d2.ok, backfillDays: d2.backfillDays, totalMs: d2.totalMs, steps: d2.steps },
+      }));
+      await fetchAll();
+    } catch (err) {
+      const code = err.response && err.response.status;
+      const msg = (err.response && err.response.data && err.response.data.message) || "Reset gagal";
+      setError(code === 401 || code === 403 ? msg + " (perlu login ulang?)" : msg);
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
+  const onBackfillRealistic = async () => {
+    setBackfillRealisticLoading(true);
+    setError(null);
+    try {
+      const r = await publicDataApi.backfillRealistic(30);
+      const data = r && r.data;
+      if (data) {
+        setLastSyncSummary({
+          jenis: "backfill_realistic",
+          ok: data.ok,
+          backfillDays: data.backfillDays,
+          totalMs: data.totalMs,
+          steps: data.steps,
+          trigger: data.trigger,
+        });
+      }
+      await fetchAll();
+    } catch (err) {
+      const code = err.response && err.response.status;
+      const msg = (err.response && err.response.data && err.response.data.message) || "Backfill realistic gagal";
+      setError(code === 401 || code === 403 ? msg + " (perlu login ulang?)" : msg);
+    } finally {
+      setBackfillRealisticLoading(false);
+    }
+  };
+
   return (
     <div ref={containerRef}>
       <PageHeader
@@ -354,12 +417,31 @@ export default function DashboardPage() {
                 <Button
                   type="primary"
                   ghost
+                  icon={<SyncOutlined spin={backfillRealisticLoading} />}
+                  onClick={onBackfillRealistic}
+                  loading={backfillRealisticLoading}
+                >
+                  Backfill 30 Hari (Realistis)
+                </Button>
+                <Button
+                  type="primary"
+                  ghost
                   icon={<SyncOutlined spin={backfill30dLoading} />}
                   onClick={onBackfill30d}
                   loading={backfill30dLoading}
                 >
-                  Backfill 30 Hari
+                  Backfill 30 Hari (Demo)
                 </Button>
+                {hasRole("ADMIN") ? (
+                  <Button
+                    danger
+                    icon={<SyncOutlined spin={resetLoading} />}
+                    onClick={onReset}
+                    loading={resetLoading}
+                  >
+                    Reset Data Dummy
+                  </Button>
+                ) : null}
               </>
             ) : null}
             <Button icon={<ReloadOutlined />} onClick={fetchAll} loading={loading}>
