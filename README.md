@@ -144,6 +144,21 @@ Untuk kondisi sekarang (backend Express stateful + Socket.IO + cron), pola yang 
 
 Jika backend akan full di Vercel, lakukan migrasi bertahap ke fungsi stateless dan gunakan pub/sub eksternal untuk realtime.
 
+## Vercel Cron (data harian otomatis)
+
+Karena backend di Vercel = serverless function (bukan proses persisten), `node-cron` di `backend/src/server.js` tidak akan jalan otomatis. Solusinya: Vercel Cron Jobs (`vercel.json` -> blok `crons`) yang memanggil endpoint `GET /api/cron/daily-generate` setiap hari jam 00:00 WIB (`0 17 * * *` UTC, schedule Hobby maks 1x/hari).
+
+Handler di [backend/src/controllers/cron.controller.js](backend/src/controllers/cron.controller.js) menjalankan 3 generator paralel dengan `Promise.allSettled`:
+1. `runDailyDummyNutrition` (distribusi MBG + pemantauan gizi kemarin/hari ini/besok).
+2. `runRealtimeBatch` (5 metrik realtime: PENERIMA_MANFAAT, DISTRIBUSI_MBG, STATUS_GIZI, LAPORAN, SPPG).
+3. `runPublicDataIngest` (5 source open data: stunting, kemiskinan, sekolah, wilayah, pangan).
+
+Otorisasi: `Authorization: Bearer ${CRON_SECRET}`. Set env `CRON_SECRET` di Vercel dashboard (Settings -> Environment Variables, production). Generate baru dengan `openssl rand -base64 48`.
+
+Batas Hobby plan: cron 1x/hari, function `maxDuration` maks 300 detik. Optimasi di [backend/src/services/dummyNutrition.service.js](backend/src/services/dummyNutrition.service.js) (500 menu default + batch paralel 4 worker) menjaga total di bawah 5 menit.
+
+Trigger manual dari UI: tombol **Generate Data Harian** + **Trigger Cron (Semua)** di header dashboard (RBAC: ADMIN/PEJABAT_BGN/PENGAWAS_GIZI). Endpoint: `POST /api/cron/daily-generate` (Bearer token user, tidak butuh `CRON_SECRET`). Hasil sinkron ditampilkan sebagai alert ringkasan di dashboard.
+
 ## GitHub Secure Setup (Wajib)
 
 Checklist keamanan repo:
