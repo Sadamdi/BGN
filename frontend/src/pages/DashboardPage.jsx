@@ -93,6 +93,9 @@ export default function DashboardPage() {
   const [streamStatus, setStreamStatus] = useState("Menghubungkan...");
   const [terakhir, setTerakhir] = useState(null);
   const [syncLoading, setSyncLoading] = useState(false);
+  const [syncDummyLoading, setSyncDummyLoading] = useState(false);
+  const [syncCronLoading, setSyncCronLoading] = useState(false);
+  const [lastSyncSummary, setLastSyncSummary] = useState(null);
 
   const fetchAll = async () => {
     setLoading(true);
@@ -197,6 +200,61 @@ export default function DashboardPage() {
     }
   };
 
+  const onSyncDummy = async () => {
+    setSyncDummyLoading(true);
+    setError(null);
+    try {
+      const r = await publicDataApi.syncDummyNutritionData();
+      const data = r && r.data;
+      if (data && data.skipped) {
+        setError("Generator data dummy sedang berjalan, coba lagi sebentar.");
+      } else if (data) {
+        setLastSyncSummary({
+          jenis: "dummy",
+          totalPorsiGenerated: data.totalPorsiGenerated,
+          totalPorsiKemarin: data.totalPorsiKemarin,
+          totalPorsiBesok: data.totalPorsiBesok,
+          totalPemantauanInserted: data.totalPemantauanInserted,
+          totalSppgUpdated: data.totalSppgUpdated,
+          daysGenerated: data.daysGenerated,
+          trigger: data.trigger,
+        });
+      }
+      await fetchAll();
+    } catch (err) {
+      const code = err.response && err.response.status;
+      const msg = (err.response && err.response.data && err.response.data.message) || "Generate data dummy gagal";
+      setError(code === 401 || code === 403 ? msg + " (perlu login ulang?)" : msg);
+    } finally {
+      setSyncDummyLoading(false);
+    }
+  };
+
+  const onSyncCron = async () => {
+    setSyncCronLoading(true);
+    setError(null);
+    try {
+      const r = await publicDataApi.triggerDailyCron();
+      const data = r && r.data;
+      if (data) {
+        setLastSyncSummary({
+          jenis: "cron",
+          ok: data.ok,
+          totalMs: data.totalMs,
+          steps: data.steps,
+          trigger: data.trigger,
+        });
+      }
+      await fetchAll();
+    } catch (err) {
+      const code = err.response && err.response.status;
+      const msg = (err.response && err.response.data && err.response.data.message) || "Trigger cron gagal";
+      setError(code === 401 || code === 403 ? msg + " (perlu login ulang?)" : msg);
+    } finally {
+      setSyncCronLoading(false);
+    }
+  };
+
   return (
     <div ref={containerRef}>
       <PageHeader
@@ -207,11 +265,33 @@ export default function DashboardPage() {
             : "Memuat data..."
         }
         actions={
-          <Space>
+          <Space wrap>
             {hasRole("ADMIN", "PEJABAT_BGN", "PENGAWAS_GIZI") ? (
-              <Button icon={<SyncOutlined />} onClick={onSyncScrape} loading={syncLoading}>
-                Sinkron Data
-              </Button>
+              <>
+                <Button
+                  icon={<SyncOutlined />}
+                  onClick={onSyncScrape}
+                  loading={syncLoading}
+                >
+                  Sinkron Data
+                </Button>
+                <Button
+                  type="primary"
+                  icon={<SyncOutlined spin={syncDummyLoading} />}
+                  onClick={onSyncDummy}
+                  loading={syncDummyLoading}
+                >
+                  Generate Data Harian
+                </Button>
+                <Button
+                  type="dashed"
+                  icon={<SyncOutlined spin={syncCronLoading} />}
+                  onClick={onSyncCron}
+                  loading={syncCronLoading}
+                >
+                  Trigger Cron (Semua)
+                </Button>
+              </>
             ) : null}
             <Button icon={<ReloadOutlined />} onClick={fetchAll} loading={loading}>
               Refresh
@@ -224,6 +304,50 @@ export default function DashboardPage() {
       />
 
       {error ? <Alert type="error" message={error} showIcon style={{ marginBottom: 12 }} /> : null}
+
+      {lastSyncSummary ? (
+        <Alert
+          type={lastSyncSummary.jenis === "cron" ? (lastSyncSummary.ok ? "success" : "warning") : "success"}
+          showIcon
+          style={{ marginBottom: 12 }}
+          message={
+            lastSyncSummary.jenis === "cron"
+              ? (lastSyncSummary.ok ? "Cron harian berhasil" : "Cron harian selesai sebagian")
+              : "Generator data dummy berhasil"
+          }
+          description={
+            lastSyncSummary.jenis === "cron" ? (
+              <div>
+                <div>Trigger: <b>{lastSyncSummary.trigger}</b> · Total: <b>{Math.round((lastSyncSummary.totalMs || 0) / 1000)}s</b></div>
+                <ul style={{ margin: "6px 0 0 16px" }}>
+                  {Object.entries(lastSyncSummary.steps || {}).map(([k, s]) => (
+                    <li key={k}>
+                      <b>{k}</b>: {s.ok ? "OK" : "GAGAL"} ({Math.round((s.durationMs || 0) / 1000)}s)
+                      {s.summary ? (
+                        <span style={{ color: "#888" }}>
+                          {s.summary.totalPorsiGenerated != null ? ` · porsi hari ini: ${s.summary.totalPorsiGenerated}` : ""}
+                          {s.summary.totalRows != null ? ` · rows: ${s.summary.totalRows}` : ""}
+                          {s.summary.total != null ? ` · indikator: ${s.summary.total}` : ""}
+                        </span>
+                      ) : null}
+                      {s.error ? <span style={{ color: "#ff4d4f" }}> · {s.error}</span> : null}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <div>
+                <div>Trigger: <b>{lastSyncSummary.trigger}</b> · SPPG diupdate: <b>{lastSyncSummary.totalSppgUpdated}</b> · Pemantauan: <b>{lastSyncSummary.totalPemantauanInserted}</b></div>
+                <div style={{ marginTop: 4 }}>
+                  Porsi kemarin: <b>{lastSyncSummary.totalPorsiKemarin}</b> · hari ini: <b>{lastSyncSummary.totalPorsiGenerated}</b> · besok: <b>{lastSyncSummary.totalPorsiBesok}</b>
+                </div>
+              </div>
+            )
+          }
+          closable
+          onClose={() => setLastSyncSummary(null)}
+        />
+      ) : null}
 
       {loading && !stat ? (
         <Skeleton active paragraph={{ rows: 6 }} />

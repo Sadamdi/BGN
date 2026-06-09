@@ -13,5 +13,6 @@ router.use("/laporan", require("./laporan.routes"));
 router.use("/pengguna", require("./pengguna.routes"));
 router.use("/notifikasi", require("./notifikasi.routes"));
 router.use("/public-data", require("./publicData.routes"));
+router.use("/cron", require("./cron.routes"));
 
 module.exports = router;
