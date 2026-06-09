@@ -182,11 +182,12 @@ async function fetchStatusGizi({ user, filter }) {
 async function previewStatusGizi({ user, filter }) {
   const rows = await fetchStatusGizi({ user, filter });
   let list = rows.map((r) => ({
-    namaLengkap: r.penerima.namaLengkap,
-    nikMasked: r.penerima.nikMasked,
-    kategori: r.penerima.kategori,
-    sppgNama: r.penerima.sppg && r.penerima.sppg.namaSppg,
-    sppgProvinsi: r.penerima.sppg && r.penerima.sppg.provinsi,
+    // Fallback ke generator kalau r.penerima null (FK mismatch / data lama).
+    namaLengkap: (r.penerima && r.penerima.namaLengkap) || generateNamaPenerima(`penerima-${r.penerimaId}-fallback`, "LAKI_LAKI"),
+    nikMasked: (r.penerima && r.penerima.nikMasked) || "************",
+    kategori: (r.penerima && r.penerima.kategori) || null,
+    sppgNama: r.penerima && r.penerima.sppg && r.penerima.sppg.namaSppg,
+    sppgProvinsi: r.penerima && r.penerima.sppg && r.penerima.sppg.provinsi,
     tanggalPengukuran: r.tanggalPengukuran,
     beratBadanKg: r.beratBadanKg,
     tinggiBadanCm: r.tinggiBadanCm,
