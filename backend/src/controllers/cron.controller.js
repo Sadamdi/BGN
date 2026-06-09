@@ -5,6 +5,9 @@ const { runRealtimeBatch } = require("../scripts/ingest/realtime-generator");
 const { runPublicDataIngest } = require("../scripts/ingest/public-data.ingest");
 const { sukses, error } = require("../utils/response");
 const { prisma } = require("../config/database");
+const { invalidatePrefix } = require("../services/cache.service");
+const path = require("path");
+const { spawn } = require("child_process");
 
 function isAuthorizedVercelCron(req) {
   // 1) Production: cocokkan dengan CRON_SECRET env var.
@@ -140,6 +143,10 @@ async function dailyGenerate(req, res, next) {
     }
 
     const allOk = dummyStep.ok && realtimeStep.ok && publicStep.ok;
+    // Invalidate dashboard & laporan cache supaya data langsung konsisten
+    // untuk user yang baru me-refresh UI setelah trigger cron.
+    await invalidatePrefix("dashboard:");
+    await invalidatePrefix("laporan:");
     return sukses(
       res,
       {
@@ -157,4 +164,78 @@ async function dailyGenerate(req, res, next) {
   }
 }
 
-module.exports = { dailyGenerate };
+function runBackfillScript() {
+  return new Promise((resolve, reject) => {
+    const child = spawn(
+      process.execPath,
+      [path.join(__dirname, "..", "scripts", "ingest", "sppg-backfill.js")],
+      { cwd: process.cwd(), stdio: "pipe", env: process.env }
+    );
+    let stderr = "";
+    child.stdout.on("data", (d) => console.log("[cron:sppg-backfill]", d.toString().trim()));
+    child.stderr.on("data", (d) => { stderr += d.toString(); console.error("[cron:sppg-backfill]", d.toString().trim()); });
+    child.on("close", (code) => {
+      if (code === 0) resolve({ ok: true });
+      else reject(new Error("Backfill gagal (exit " + code + "): " + stderr));
+    });
+  });
+}
+
+async function backfillSppg(req, res, next) {
+  const startedAt = new Date();
+  try {
+    const step = await withStep("sppg_backfill", () => runBackfillScript());
+    const finishedAt = new Date();
+    await invalidatePrefix("dashboard:");
+    await invalidatePrefix("laporan:");
+    return sukses(
+      res,
+      {
+        ok: true,
+        trigger: "manual_backfill_sppg",
+        startedAt: startedAt.toISOString(),
+        finishedAt: finishedAt.toISOString(),
+        totalMs: finishedAt - startedAt,
+        steps: { sppg_backfill: step },
+      },
+      "Backfill SPPG selesai"
+    );
+  } catch (err) {
+    return next(err);
+  }
+}
+
+async function backfill30d(req, res, next) {
+  const startedAt = new Date();
+  try {
+    const backfillDays = Math.max(1, Math.min(60, parseInt(req.body && req.body.backfillDays, 10) || 30));
+    const [dummyStep, realtimeStep, publicStep] = await Promise.all([
+      withStep("dummy", () =>
+        runDailyDummyNutrition({ trigger: "manual_backfill_30d", backfillDays, skipLock: true })
+      ),
+      withStep("realtime", () => runRealtimeBatch({ trigger: "manual_backfill_30d" })),
+      withStep("public", () => runPublicDataIngest({ trigger: "manual_backfill_30d" })),
+    ]);
+    const finishedAt = new Date();
+    const allOk = dummyStep.ok && realtimeStep.ok && publicStep.ok;
+    await invalidatePrefix("dashboard:");
+    await invalidatePrefix("laporan:");
+    return sukses(
+      res,
+      {
+        ok: allOk,
+        trigger: "manual_backfill_30d",
+        backfillDays,
+        startedAt: startedAt.toISOString(),
+        finishedAt: finishedAt.toISOString(),
+        totalMs: finishedAt - startedAt,
+        steps: { dummy: dummyStep, realtime: realtimeStep, public: publicStep },
+      },
+      allOk ? "Backfill 30 hari berhasil" : "Backfill 30 hari selesai sebagian"
+    );
+  } catch (err) {
+    return next(err);
+  }
+}
+
+module.exports = { dailyGenerate, backfillSppg, backfill30d };

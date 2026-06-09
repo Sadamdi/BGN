@@ -58,6 +58,11 @@ export function syncDummyNutritionData(options = {}) {
 
 // Trigger Vercel Cron handler terpadu (dummy + realtime + public) dari UI.
 // Backend butuh waktu panjang (sampai 5 menit) -> timeout dinaikkan.
-export function triggerDailyCron() {
-  return api.post("/cron/daily-generate", {}, { timeout: 360000 }).then((r) => r.data);
-}
+export const triggerDailyCron = () => api.post("/cron/daily-generate", {}, { timeout: 360000 }).then((r) => r.data);
+
+// Backfill SPPG (kapasitas realistis + penerima dummy). Bisa sampai 10 menit (3354 SPPG).
+export const backfillSppg = () => api.post("/cron/backfill-sppg", {}, { timeout: 600000 }).then((r) => r.data);
+
+// Backfill 30 hari distribusi + realtime + public.
+export const backfill30d = (backfillDays = 30) =>
+  api.post("/cron/backfill-30d", { backfillDays }, { timeout: 600000 }).then((r) => r.data);

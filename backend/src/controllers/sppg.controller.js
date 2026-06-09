@@ -75,13 +75,27 @@ async function listSppg(req, res, next) {
       prisma.sppg.count({ where: finalWhere }),
     ]);
 
-    const yest = startOfDay(dayjs().subtract(1, "day").toDate());
+    // Window 2 hari (kemarin UTC + kemarin WIB) untuk toleransi timezone Vercel region iad1.
+    // Konsisten dengan logic getSebaranSppg & laporan.service.
+    const yestUtc = startOfDay(dayjs().subtract(1, "day").toDate());
+    const yestJakarta = startOfDay(dayjs().subtract(1, "day").tz("Asia/Jakarta").toDate());
     const ids = sppgs.map((s) => s.id);
     const dist = await prisma.distribusiMbg.findMany({
-      where: { sppgId: { in: ids }, tanggalDistribusi: yest },
-      select: { sppgId: true, totalPorsi: true },
+      where: {
+        sppgId: { in: ids },
+        OR: [
+          { tanggalDistribusi: yestUtc },
+          { tanggalDistribusi: yestJakarta },
+        ],
+      },
+      select: { sppgId: true, totalPorsi: true, tanggalDistribusi: true },
     });
-    const distMap = new Map(dist.map((d) => [d.sppgId, d.totalPorsi]));
+    // Map per SPPG: ambil totalPorsi max kalau ada dua baris (UTC vs WIB).
+    const distMap = new Map();
+    for (const d of dist) {
+      const cur = distMap.get(d.sppgId);
+      if (!cur || d.totalPorsi > cur) distMap.set(d.sppgId, d.totalPorsi);
+    }
 
     const items = sppgs.map((s) => ({
       ...s,

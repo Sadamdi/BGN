@@ -128,10 +128,12 @@ async function syncDummyNutritionData(req, res, next) {
   try {
     const totalRecords = Number(req.body && req.body.totalRecords);
     const totalMenus = Number(req.body && req.body.totalMenus) || 1000;
+    const backfillDays = Number(req.body && req.body.backfillDays) || 0;
     const result = await runDailyDummyNutrition({
-      trigger: "manual_api",
+      trigger: backfillDays > 0 ? "manual_api_backfill" : "manual_api",
       totalRecords,
       totalMenus,
+      backfillDays,
     });
     if (result && result.skipped) {
       return sukses(
