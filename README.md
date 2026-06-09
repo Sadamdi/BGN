@@ -159,6 +159,14 @@ Batas Hobby plan: cron 1x/hari, function `maxDuration` maks 300 detik. Optimasi 
 
 Trigger manual dari UI: tombol **Generate Data Harian** + **Trigger Cron (Semua)** di header dashboard (RBAC: ADMIN/PEJABAT_BGN/PENGAWAS_GIZI). Endpoint: `POST /api/cron/daily-generate` (Bearer token user, tidak butuh `CRON_SECRET`). Hasil sinkron ditampilkan sebagai alert ringkasan di dashboard.
 
+### Troubleshooting: cron tidak jalan
+
+1. **Project Vercel paused** -> Buka Vercel dashboard, project `bgn`, pastikan status aktif. Pada MCP terlihat `live: false` -> klik "Resume" / unpause.
+2. **GitHub integration terputus** -> Settings -> Git -> Reconnect repository `Sadamdi/BGN`. Vercel hanya akan auto-deploy saat push ke branch yang dipantau (default `main`).
+3. **Deploy manual via Deploy Hook** -> Settings -> Git -> Deploy Hooks -> buat hook URL, simpan di GitHub secrets `VERCEL_DEPLOY_HOOK_URL`, tambahkan workflow `.github/workflows/deploy.yml` yang panggil hook setiap push ke main.
+4. **Trigger ad-hoc dari terminal** -> `curl -H "Authorization: Bearer $CRON_SECRET" https://bgn-xi.vercel.app/api/cron/daily-generate` (atau lewat tombol di dashboard).
+5. **Cek log** -> Vercel dashboard -> Logs -> filter `vercel-cron/1.0` di user agent. Akan terlihat 200 OK atau 504 timeout.
+
 ## GitHub Secure Setup (Wajib)
 
 Checklist keamanan repo:
