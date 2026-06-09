@@ -191,14 +191,14 @@ async function backfillSppg(req, res, next) {
     return sukses(
       res,
       {
-        ok: true,
+        ok: step.ok,
         trigger: "manual_backfill_sppg",
         startedAt: startedAt.toISOString(),
         finishedAt: finishedAt.toISOString(),
         totalMs: finishedAt - startedAt,
         steps: { sppg_backfill: step },
       },
-      "Backfill SPPG selesai"
+      step.ok ? "Backfill SPPG selesai" : "Backfill SPPG selesai sebagian"
     );
   } catch (err) {
     return next(err);

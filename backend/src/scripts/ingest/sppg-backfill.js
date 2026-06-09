@@ -164,18 +164,24 @@ async function main() {
   const updatedKapasitas = await backfillKapasitas(sppgs);
   console.log("[sppg-backfill] kapasitas diupdate:", updatedKapasitas);
 
-  // Step 2: penerima per SPPG
+  // Step 2: penerima per SPPG (try/catch per SPPG supaya 1 gagal tidak abort seluruh batch)
   let totalPenerima = 0;
+  let totalErrors = 0;
   for (const s of sppgs) {
-    const inserted = await backfillPenerimaForSppg(s);
-    if (inserted > 0) {
-      totalPenerima += inserted;
-      if (totalPenerima % 500 === 0) {
-        console.log(`[sppg-backfill] inserted ${totalPenerima} penerima...`);
+    try {
+      const inserted = await backfillPenerimaForSppg(s);
+      if (inserted > 0) {
+        totalPenerima += inserted;
+        if (totalPenerima % 500 === 0) {
+          console.log(`[sppg-backfill] inserted ${totalPenerima} penerima...`);
+        }
       }
+    } catch (e) {
+      totalErrors += 1;
+      console.error("[sppg-backfill] gagal insert penerima untuk SPPG", s.kodeSppg, ":", e.message);
     }
   }
-  console.log("[sppg-backfill] total penerima terinsert:", totalPenerima);
+  console.log("[sppg-backfill] total penerima terinsert:", totalPenerima, "errors:", totalErrors);
 
   await prisma.ingestBatch.create({
     data: {
