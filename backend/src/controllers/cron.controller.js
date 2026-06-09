@@ -101,8 +101,9 @@ async function dailyGenerate(req, res, next) {
 
     // Jalankan steps secara allSettled agar 1 step gagal tidak menghentikan step lain.
     // Urutan: dummy -> realtime -> public.
+    // Cron harian Vercel pakai mode "realistic" (nasional 1rb-1jt/hari).
     const [dummyStep, realtimeStep, publicStep] = await Promise.all([
-      withStep("dummy", () => runDailyDummyNutrition({ trigger, skipLock: true })),
+      withStep("dummy", () => runDailyDummyNutrition({ trigger, skipLock: true, mode: "realistic" })),
       withStep("realtime", () => runRealtimeBatch({ trigger })),
       withStep("public", () => runPublicDataIngest({ trigger })),
     ]);
@@ -209,9 +210,10 @@ async function backfill30d(req, res, next) {
   const startedAt = new Date();
   try {
     const backfillDays = Math.max(1, Math.min(60, parseInt(req.body && req.body.backfillDays, 10) || 30));
+    // mode realistic = nasional 1rb-1jt/hari
     const [dummyStep, realtimeStep, publicStep] = await Promise.all([
       withStep("dummy", () =>
-        runDailyDummyNutrition({ trigger: "manual_backfill_30d", backfillDays, skipLock: true })
+        runDailyDummyNutrition({ trigger: "manual_backfill_30d", backfillDays, skipLock: true, mode: "realistic" })
       ),
       withStep("realtime", () => runRealtimeBatch({ trigger: "manual_backfill_30d" })),
       withStep("public", () => runPublicDataIngest({ trigger: "manual_backfill_30d" })),

@@ -75,8 +75,10 @@ async function listSppg(req, res, next) {
       prisma.sppg.count({ where: finalWhere }),
     ]);
 
-    // Window 2 hari (kemarin UTC + kemarin WIB) untuk toleransi timezone Vercel region iad1.
-    // Konsisten dengan logic getSebaranSppg & laporan.service.
+    // Window untuk toleransi timezone: kemarin UTC + kemarin WIB.
+    // Row distribusi disimpan di timezone Asia/Jakarta (00:00 WIB = 17:00 UTC hari sebelumnya).
+    // Server region iad1 (UTC), jadi query pakai 2 tanggal (UTC + Jakarta kemarin)
+    // untuk menangkap kedua representasi tanggal yang mungkin dipakai cron.
     const yestUtc = startOfDay(dayjs().subtract(1, "day").toDate());
     const yestJakarta = startOfDay(dayjs().subtract(1, "day").tz("Asia/Jakarta").toDate());
     const ids = sppgs.map((s) => s.id);

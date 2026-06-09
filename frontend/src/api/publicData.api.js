@@ -66,3 +66,12 @@ export const backfillSppg = () => api.post("/cron/backfill-sppg", {}, { timeout:
 // Backfill 30 hari distribusi + realtime + public.
 export const backfill30d = (backfillDays = 30) =>
   api.post("/cron/backfill-30d", { backfillDays }, { timeout: 600000 }).then((r) => r.data);
+
+// Admin: reset distribusi dummy (hapus distribusi_mbg, pemantauan_gizi,
+// realtime_metric, realtime_event_stream, ingest_batch). Idempotent.
+export const resetDistribusi = (mode = "all") =>
+  api.post("/admin/reset-distribusi", { mode }, { timeout: 60000 }).then((r) => r.data);
+
+// Admin: backfill 30 hari mode realistic (nasional 1rb-1jt/hari).
+export const backfillRealistic = (backfillDays = 30) =>
+  api.post("/admin/backfill-realistic", { backfillDays }, { timeout: 600000 }).then((r) => r.data);

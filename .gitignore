@@ -27,3 +27,8 @@ prompt_master.md
 .env.check
 .env.prod.now
 .env.swap
+
+# Catatan: docs/ lokal yang bukan untuk umum (vercel-deploy.md, SRS, SE docx) di-ignore manual
+docs/vercel-deploy.md
+docs/SE dengan AI Pemodelan Kebutuhan.docx
+docs/SRS Kelompok 2 BGN.docx

@@ -129,11 +129,15 @@ async function syncDummyNutritionData(req, res, next) {
     const totalRecords = Number(req.body && req.body.totalRecords);
     const totalMenus = Number(req.body && req.body.totalMenus) || 1000;
     const backfillDays = Number(req.body && req.body.backfillDays) || 0;
+    // mode: "absurdly_high" (default) untuk demo chart besar di UI; "realistic"
+    // untuk cron harian (nasional 1rb-1jt/hari).
+    const mode = (req.body && req.body.mode) || "absurdly_high";
     const result = await runDailyDummyNutrition({
       trigger: backfillDays > 0 ? "manual_api_backfill" : "manual_api",
       totalRecords,
       totalMenus,
       backfillDays,
+      mode,
     });
     if (result && result.skipped) {
       return sukses(
