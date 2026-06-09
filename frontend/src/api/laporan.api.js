@@ -3,6 +3,7 @@ import api from "./axios";
 export const previewDistribusi = (filter) => api.post("/laporan/distribusi/preview", filter).then((r) => r.data);
 export const previewStatusGizi = (filter) => api.post("/laporan/status-gizi/preview", filter).then((r) => r.data);
 export const previewKinerjaSppg = (filter) => api.post("/laporan/kinerja-sppg/preview", filter).then((r) => r.data);
+export const previewPenerima = (filter) => api.post("/laporan/penerima/preview", filter).then((r) => r.data);
 
 export function exportExcel(jenis, filter) {
   return api.post(`/laporan/${jenis}/excel`, filter, { responseType: "blob" }).then((r) => r.data);

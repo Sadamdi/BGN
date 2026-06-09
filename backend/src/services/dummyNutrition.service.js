@@ -6,6 +6,7 @@ const timezone = require("dayjs/plugin/timezone");
 const { prisma } = require("../config/database");
 const { getRedis } = require("../config/redis");
 const { hitungZScore, klasifikasiStatusGizi } = require("./zscore.service");
+const { generateNamaPenerima } = require("./namaGenerator");
 
 const JOB_LOCK_KEY = "job:dummy-nutrition-daily";
 const TZ = "Asia/Jakarta";
@@ -335,6 +336,55 @@ function distributeByCapacity(sppgs, totalRecords) {
   return map;
 }
 
+// Distribusi proporsi kategori penerima sesuai demografi SPPG tipikal Indonesia.
+// Sedikit di-variasi per SPPG + tanggal sehingga tidak monoton.
+function buildCategoryAllocation(sppg, date, total) {
+  const seed = (sppg.id || "") + "|" + dayjs(date).tz(TZ).format("YYYY-MM-DD");
+  const rng = (() => {
+    let h = 0;
+    for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+    return () => {
+      h = (h * 1664525 + 1013904223) >>> 0;
+      return (h & 0xffffffff) / 0x100000000;
+    };
+  })();
+
+  // Base proporsi (total = 1.0): PESERTA_DIDIK 55%, BALITA 25%, IBU_HAMIL 10%, IBU_MENYUSUI 10%.
+  // Tambah jitter ±5% per kategori, lalu normalize.
+  const base = { PESERTA_DIDIK: 0.55, BALITA: 0.25, IBU_HAMIL: 0.1, IBU_MENYUSUI: 0.1 };
+  const jitter = () => (rng() - 0.5) * 0.1;
+  const raw = {
+    PESERTA_DIDIK: Math.max(0.2, base.PESERTA_DIDIK + jitter()),
+    BALITA: Math.max(0.1, base.BALITA + jitter()),
+    IBU_HAMIL: Math.max(0.05, base.IBU_HAMIL + jitter()),
+    IBU_MENYUSUI: Math.max(0.05, base.IBU_MENYUSUI + jitter()),
+  };
+  const sumR = raw.PESERTA_DIDIK + raw.BALITA + raw.IBU_HAMIL + raw.IBU_MENYUSUI;
+  const norm = {
+    PESERTA_DIDIK: raw.PESERTA_DIDIK / sumR,
+    BALITA: raw.BALITA / sumR,
+    IBU_HAMIL: raw.IBU_HAMIL / sumR,
+    IBU_MENYUSUI: raw.IBU_MENYUSUI / sumR,
+  };
+  // Largest-remainder rounding supaya total pas = total.
+  const rawCounts = {
+    PESERTA_DIDIK: norm.PESERTA_DIDIK * total,
+    BALITA: norm.BALITA * total,
+    IBU_HAMIL: norm.IBU_HAMIL * total,
+    IBU_MENYUSUI: norm.IBU_MENYUSUI * total,
+  };
+  const floors = {
+    PESERTA_DIDIK: Math.floor(rawCounts.PESERTA_DIDIK),
+    BALITA: Math.floor(rawCounts.BALITA),
+    IBU_HAMIL: Math.floor(rawCounts.IBU_HAMIL),
+    IBU_MENYUSUI: Math.floor(rawCounts.IBU_MENYUSUI),
+  };
+  let sisa = total - (floors.PESERTA_DIDIK + floors.BALITA + floors.IBU_HAMIL + floors.IBU_MENYUSUI);
+  const order = Object.keys(floors).sort((a, b) => rawCounts[b] - floors[b] - (rawCounts[a] - floors[a]));
+  for (let i = 0; i < sisa; i++) floors[order[i % order.length]] += 1;
+  return floors;
+}
+
 function computeDailyTotalPortionsFromCapacity(sppgs) {
   const totalCapacity = sppgs.reduce((sum, s) => sum + Math.max(1, Number(s.kapasitasPorsiPerHari || 1)), 0);
   if (totalCapacity <= 0) return 1000;
@@ -490,29 +540,54 @@ async function runDailyDummyNutrition(options = {}) {
         const todayPlan = weeklyPlan[weekdayKey];
         const menuSamples = [];
         let totalEnergy = 0;
+        // Proporsi kategori penerima realistik per SPPG (bervariasi antar SPPG & tanggal).
+        const catAlloc = buildCategoryAllocation(sppg, slice.date, target);
         let porsiPesertaDidik = 0;
         let porsiBalita = 0;
         let porsiIbuHamil = 0;
         let porsiIbuMenyusui = 0;
 
         const pemantauanTarget = recPool.length ? Math.min(15, Math.max(1, Math.round(target * 0.25))) : 0;
+        // Filter penerima sesuai proporsi kategori hari ini agar tidak bias ke PESERTA_DIDIK.
+        const recByCategory = (k) => recPool.filter((r) => r.kategori === k);
+        const kategoriSampling = [
+          { key: "PESERTA_DIDIK", count: Math.max(0, Math.round(catAlloc.PESERTA_DIDIK * 0.25)) },
+          { key: "BALITA", count: Math.max(0, Math.round(catAlloc.BALITA * 0.25)) },
+          { key: "IBU_HAMIL", count: Math.max(0, Math.round(catAlloc.IBU_HAMIL * 0.25)) },
+          { key: "IBU_MENYUSUI", count: Math.max(0, Math.round(catAlloc.IBU_MENYUSUI * 0.25)) },
+        ];
         for (let i = 0; i < pemantauanTarget; i++) {
-          const recipient = recPool[randInt(0, recPool.length - 1)];
+          // Sampling kategori secara round-robin sesuai proporsi.
+          let kat = null;
+          let rec = null;
+          for (const ks of kategoriSampling) {
+            if (ks.count <= 0) continue;
+            const pool = recByCategory(ks.key);
+            if (pool.length) {
+              kat = ks.key;
+              rec = pool[randInt(0, pool.length - 1)];
+              ks.count -= 1;
+              break;
+            }
+          }
+          // Fallback jika pool kategori tidak ada.
+          if (!rec) rec = recPool[randInt(0, recPool.length - 1)];
+          if (!kat) kat = rec.kategori;
           const menuLite = todayPlan.menus[i % todayPlan.menus.length];
           const menu = menuPool.find((m) => m.code === menuLite.code) || menuPool[randInt(0, menuPool.length - 1)];
-          const anthropo = estimateAnthropometry(recipient, menu);
+          const anthropo = estimateAnthropometry({ ...rec, kategori: kat }, menu);
           const z = hitungZScore({
             beratBadanKg: anthropo.beratBadanKg,
             tinggiBadanCm: anthropo.tinggiBadanCm,
             usiaBulan: anthropo.usiaBulan,
-            jenisKelamin: recipient.jenisKelamin,
+            jenisKelamin: rec.jenisKelamin,
           });
           const klas = klasifikasiStatusGizi(z);
           const preferred = chooseStatusFromMenu(menu);
           const statusGizi = klas.statusGizi === "GIZI_BAIK" ? preferred : klas.statusGizi;
           const petugasId = operatorBySppg.get(sppg.id) || fallbackPetugasId;
           pemantauanRows.push({
-            penerimaId: recipient.id,
+            penerimaId: rec.id,
             tanggalPengukuran: slice.date,
             beratBadanKg: anthropo.beratBadanKg,
             tinggiBadanCm: anthropo.tinggiBadanCm,
@@ -533,20 +608,16 @@ async function runDailyDummyNutrition(options = {}) {
           });
         }
 
+        // Ikat porsi per kategori mengikuti proporsi yang sudah dihitung.
+        porsiPesertaDidik = catAlloc.PESERTA_DIDIK;
+        porsiBalita = catAlloc.BALITA;
+        porsiIbuHamil = catAlloc.IBU_HAMIL;
+        porsiIbuMenyusui = catAlloc.IBU_MENYUSUI;
         for (let i = 0; i < target; i++) {
           const menuLite = todayPlan.menus[i % todayPlan.menus.length];
           const menu = menuPool.find((m) => m.code === menuLite.code) || menuPool[randInt(0, menuPool.length - 1)];
           totalEnergy += menu.totalNutrition.energyKkal;
           if (menuSamples.length < 10) menuSamples.push(menu);
-          if (recPool.length) {
-            const rc = recPool[randInt(0, recPool.length - 1)];
-            if (rc.kategori === "PESERTA_DIDIK") porsiPesertaDidik += 1;
-            else if (rc.kategori === "BALITA") porsiBalita += 1;
-            else if (rc.kategori === "IBU_HAMIL") porsiIbuHamil += 1;
-            else porsiIbuMenyusui += 1;
-          } else {
-            porsiPesertaDidik += 1;
-          }
         }
 
         const totalPorsi =
@@ -728,4 +799,9 @@ function buildSyntheticMenuSnapshotForSppg({ sppgId, date = new Date(), totalMen
   };
 }
 
-module.exports = { runDailyDummyNutrition, buildSyntheticMenuSnapshotForSppg };
+module.exports = {
+  runDailyDummyNutrition,
+  buildSyntheticMenuSnapshotForSppg,
+  buildCategoryAllocation,
+  generateNamaPenerima,
+};

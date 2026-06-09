@@ -6,7 +6,7 @@ const { startOfDay, endOfDay } = require("../utils/dateRange");
 const { buildSppgFilter } = require("../middleware/rbac");
 const { kirimEmail } = require("./email.service");
 const excelService = require("./excel.service");
-const { buildSyntheticMenuSnapshotForSppg } = require("./dummyNutrition.service");
+const { buildSyntheticMenuSnapshotForSppg, buildCategoryAllocation, generateNamaPenerima } = require("./dummyNutrition.service");
 
 const MAX_ROWS = 50000;
 
@@ -95,15 +95,17 @@ async function previewDistribusi({ user, filter }) {
       const snap = buildSyntheticMenuSnapshotForSppg({ sppgId: s.id, date: tgl, totalMenus: 1000 });
       const factor = seededRange(simpleHash(s.id + String(tgl)), 0.35, 0.9);
       const totalPorsi = Math.max(1, Math.round((s.kapasitasPorsiPerHari || 1) * factor));
+      // Proporsi realistis per SPPG (bervariasi per tanggal).
+      const cat = buildCategoryAllocation(s, tgl, totalPorsi);
       return {
         id: `fallback-${s.id}`,
         sppgId: s.id,
         tanggalDistribusi: tgl,
-        porsiPesertaDidik: totalPorsi,
-        porsiBalita: 0,
-        porsiIbuHamil: 0,
-        porsiIbuMenyusui: 0,
-        totalPorsi,
+        porsiPesertaDidik: cat.PESERTA_DIDIK,
+        porsiBalita: cat.BALITA,
+        porsiIbuHamil: cat.IBU_HAMIL,
+        porsiIbuMenyusui: cat.IBU_MENYUSUI,
+        totalPorsi: cat.PESERTA_DIDIK + cat.BALITA + cat.IBU_HAMIL + cat.IBU_MENYUSUI,
         status: "TERVALIDASI",
         sppg: { kodeSppg: s.kodeSppg, namaSppg: s.namaSppg, provinsi: s.provinsi },
         menuHarian: snap.menuHarian,
@@ -213,9 +215,13 @@ async function previewStatusGizi({ user, filter }) {
         const seed = simpleHash(`${s.id}-${kat}-${i}-${j}`);
         const z = Math.round((seededRange(seed, -2.5, 1.8)) * 100) / 100;
         const statusGizi = z < -2 ? "GIZI_KURANG" : z > 1.5 ? "GIZI_LEBIH" : "GIZI_BAIK";
+        // Tentukan JK dari seed supaya nama & JK konsisten.
+        const isLaki = ((seed % 100) / 100) < 0.5;
+        const jenisKelamin = isLaki ? "LAKI_LAKI" : "PEREMPUAN";
+        const namaLengkap = generateNamaPenerima(`penerima-${s.id}-${kat}-${i}-${j}-${tgl.getTime()}`, jenisKelamin);
         return {
-          namaLengkap: `Dummy ${kat.replace("_", " ")} ${i + 1}-${j + 1}`,
-          nikMasked: "************",
+          namaLengkap,
+          nikMasked: "************" + String(((seed >>> 8) % 10000)).padStart(4, "0"),
           kategori: kat,
           sppgNama: s.namaSppg,
           sppgProvinsi: s.provinsi,
@@ -309,13 +315,23 @@ async function previewKinerjaSppg({ user, filter }) {
   if (filter.sppgId) where.id = filter.sppgId;
   if (filter.provinsi) where.provinsi = filter.provinsi;
 
+  // Pagination untuk skala 3.000+ SPPG. Default page 1, 25 baris.
+  const page = Math.max(1, parseInt(filter.page, 10) || 1);
+  const limit = Math.min(200, Math.max(5, parseInt(filter.limit, 10) || 25));
+  const skip = (page - 1) * limit;
+
+  // Total count terpisah (cepat dengan @@index[statusAktif]).
+  const total = await prisma.sppg.count({ where });
   const sppgs = await prisma.sppg.findMany({
     where,
+    orderBy: { namaSppg: "asc" },
     include: { _count: { select: { penerimaManfaat: { where: { statusAktif: true } } } } },
+    skip,
+    take: limit,
   });
   const since = filter.periodeAwal ? startOfDay(filter.periodeAwal) : dayjs().subtract(30, "day").startOf("day").toDate();
   const ids = sppgs.map((s) => s.id);
-  const dist = await prisma.distribusiMbg.findMany({
+  const dist = ids.length === 0 ? [] : await prisma.distribusiMbg.findMany({
     where: { sppgId: { in: ids }, tanggalDistribusi: { gte: since } },
     select: { sppgId: true, totalPorsi: true, catatan: true, tanggalDistribusi: true },
     orderBy: { tanggalDistribusi: "desc" },
@@ -356,14 +372,147 @@ async function previewKinerjaSppg({ user, filter }) {
       statusAktif: s.statusAktif,
     };
   });
+  // Ringkasan dihitung dari agregat DB (bukan dari rows paginated) supaya akurat.
+  const [capacitySum, aggDist] = await Promise.all([
+    prisma.sppg.aggregate({ where, _sum: { kapasitasPorsiPerHari: true } }),
+    ids.length === 0
+      ? Promise.resolve({ _sum: { totalPorsi: null } })
+      : prisma.distribusiMbg.aggregate({
+          where: { sppgId: { in: ids }, tanggalDistribusi: { gte: since } },
+          _sum: { totalPorsi: true },
+          _count: { _all: true },
+        }),
+  ]);
+  const totalDistPorsi = Number(aggDist._sum.totalPorsi || 0);
+  const totalDistRows = Number(aggDist._count._all || 0);
   return {
-    totalRows: rows.length,
+    totalRows: total,
     summary: {
-      "Total SPPG": rows.length,
+      "Total SPPG": total,
+      "Total Kapasitas (porsi/hari)": Number(capacitySum._sum.kapasitasPorsiPerHari || 0),
       "Rata-rata Realisasi %": rows.length ? Math.round((rows.reduce((s, r) => s + (r.realisasiPersen || 0), 0) / rows.length) * 100) / 100 : 0,
-      "Total Menu Hari Ini": rows.reduce((s, r) => s + (r.totalMenuHariIni || 0), 0),
+      "Total Porsi (30 hari)": totalDistPorsi,
+      "Rata-rata Porsi/Hari": totalDistRows ? Math.round(totalDistPorsi / totalDistRows) : 0,
     },
     rows,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    },
+  };
+}
+
+async function previewPenerima({ user, filter }) {
+  const where = buildAccessFilter(user, {});
+  if (filter.kategori) where.kategori = filter.kategori;
+  if (filter.provinsi) where.sppg = { provinsi: filter.provinsi };
+  if (filter.search) {
+    where.OR = [
+      { namaLengkap: { contains: filter.search, mode: "insensitive" } },
+      { nikMasked: { contains: filter.search, mode: "insensitive" } },
+    ];
+  }
+
+  const page = Math.max(1, parseInt(filter.page, 10) || 1);
+  const limit = Math.min(200, Math.max(5, parseInt(filter.limit, 10) || 25));
+  const skip = (page - 1) * limit;
+
+  let total;
+  let rows;
+  try {
+    total = await prisma.penerimaManfaat.count({ where });
+    rows = await prisma.penerimaManfaat.findMany({
+      where,
+      include: { sppg: { select: { namaSppg: true, provinsi: true } } },
+      orderBy: { namaLengkap: "asc" },
+      skip,
+      take: limit,
+    });
+  } catch (err) {
+    total = 0;
+    rows = [];
+  }
+
+  let list = rows.map((p) => ({
+    id: p.id,
+    namaLengkap: p.namaLengkap,
+    nikMasked: p.nikMasked,
+    tanggalLahir: p.tanggalLahir,
+    jenisKelamin: p.jenisKelamin,
+    kategori: p.kategori,
+    sppgNama: p.sppg && p.sppg.namaSppg,
+    sppgProvinsi: p.sppg && p.sppg.provinsi,
+    statusAktif: p.statusAktif,
+  }));
+
+  // Fallback generator kalau DB kosong (supaya UI tidak kosong sebelum cron jalan).
+  if (list.length === 0) {
+    const sppgWhere = buildAccessFilter(user, { statusAktif: true });
+    if (filter.provinsi) sppgWhere.provinsi = filter.provinsi;
+    const sppgFallback = await prisma.sppg.findMany({
+      where: sppgWhere,
+      select: { id: true, namaSppg: true, provinsi: true, kabupatenKota: true },
+      take: 20,
+      orderBy: { namaSppg: "asc" },
+    });
+    const kategoriSet = filter.kategori
+      ? [filter.kategori]
+      : ["PESERTA_DIDIK", "BALITA", "IBU_HAMIL", "IBU_MENYUSUI"];
+    const now = new Date();
+    const fallbackRows = [];
+    let counter = 0;
+    for (const s of sppgFallback) {
+      for (const kat of kategoriSet) {
+        for (let j = 0; j < 5; j++) {
+          const seed = `fallback-penerima-${s.id}-${kat}-${counter}`;
+          const seedHash = simpleHash(seed);
+          const isLaki = (seedHash % 100) / 100 < 0.5;
+          const jenisKelamin = isLaki ? "LAKI_LAKI" : "PEREMPUAN";
+          const namaLengkap = generateNamaPenerima(seed, jenisKelamin);
+          const dob = dayjs().subtract(
+            kat === "BALITA" ? 1 + (seedHash % 5)
+              : kat === "PESERTA_DIDIK" ? 6 + (seedHash % 12)
+              : kat === "IBU_HAMIL" ? 18 + (seedHash % 12)
+              : 20 + (seedHash % 10),
+            "year"
+          ).toDate();
+          fallbackRows.push({
+            id: `fallback-${s.id}-${kat}-${j}`,
+            namaLengkap,
+            nikMasked: "************" + String((seedHash >>> 8) % 10000).padStart(4, "0"),
+            tanggalLahir: dob,
+            jenisKelamin,
+            kategori: kat,
+            sppgNama: s.namaSppg,
+            sppgProvinsi: s.provinsi,
+            statusAktif: true,
+          });
+          counter += 1;
+        }
+      }
+    }
+    total = fallbackRows.length;
+    list = fallbackRows.slice(skip, skip + limit);
+  }
+
+  return {
+    totalRows: total,
+    summary: {
+      "Total Penerima": total,
+      "Peserta Didik": list.filter((r) => r.kategori === "PESERTA_DIDIK").length,
+      "Balita": list.filter((r) => r.kategori === "BALITA").length,
+      "Ibu Hamil": list.filter((r) => r.kategori === "IBU_HAMIL").length,
+      "Ibu Menyusui": list.filter((r) => r.kategori === "IBU_MENYUSUI").length,
+    },
+    rows: list,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    },
   };
 }
 
@@ -428,6 +577,7 @@ module.exports = {
   exportStatusGizi,
   exportKinerjaSppg,
   previewKinerjaSppg,
+  previewPenerima,
   exportPenerima,
   jalankanJadwalAktif,
   MAX_ROWS,
