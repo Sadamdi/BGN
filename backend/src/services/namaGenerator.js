@@ -46,8 +46,9 @@ function seededRandom(seedText) {
   const s = String(seedText || "");
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
   return () => {
+    // Pakai unsigned right shift `>>> 0` di akhir agar hasil selalu 0..1 (non-negatif).
     h = (h * 1664525 + 1013904223) >>> 0;
-    return (h & 0xffffffff) / 0x100000000;
+    return (h >>> 0) / 0x100000000;
   };
 }
 
