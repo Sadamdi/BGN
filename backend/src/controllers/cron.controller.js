@@ -1,0 +1,160 @@
+"use strict";
+
+const { runDailyDummyNutrition } = require("../services/dummyNutrition.service");
+const { runRealtimeBatch } = require("../scripts/ingest/realtime-generator");
+const { runPublicDataIngest } = require("../scripts/ingest/public-data.ingest");
+const { sukses, error } = require("../utils/response");
+const { prisma } = require("../config/database");
+
+function isAuthorizedVercelCron(req) {
+  // 1) Production: cocokkan dengan CRON_SECRET env var.
+  if (process.env.NODE_ENV === "production") {
+    const expected = process.env.CRON_SECRET;
+    if (!expected) {
+      return { ok: false, reason: "CRON_SECRET belum diset di environment" };
+    }
+    const headerToken = req.headers["authorization"] || "";
+    const match = /^Bearer\s+(.+)$/i.exec(headerToken);
+    const provided = match ? match[1].trim() : "";
+    if (provided !== expected) {
+      return { ok: false, reason: "Bearer token tidak valid" };
+    }
+    return { ok: true, source: "bearer_cron_secret" };
+  }
+
+  // 2) Non-production (dev/test): izinkan tanpa token untuk本地 testing.
+  return { ok: true, source: "dev_skip_auth" };
+}
+
+async function withStep(name, fn) {
+  const started = Date.now();
+  try {
+    const result = await fn();
+    return {
+      name,
+      ok: true,
+      durationMs: Date.now() - started,
+      summary: summarizeResult(name, result),
+      raw: result,
+    };
+  } catch (err) {
+    console.error("[cron:daily-generate] step " + name + " gagal:", err.message);
+    return {
+      name,
+      ok: false,
+      durationMs: Date.now() - started,
+      error: err.message,
+    };
+  }
+}
+
+function summarizeResult(name, result) {
+  if (!result) return null;
+  if (name === "dummy") {
+    return {
+      success: result.success === true,
+      skipped: result.skipped === true,
+      totalMenuPool: result.totalMenuPool,
+      totalUniqueMenus: result.totalUniqueMenus,
+      totalPorsiGenerated: result.totalPorsiGenerated,
+      totalPorsiKemarin: result.totalPorsiKemarin,
+      totalPorsiBesok: result.totalPorsiBesok,
+      totalPemantauanInserted: result.totalPemantauanInserted,
+      totalSppgUpdated: result.totalSppgUpdated,
+      daysGenerated: result.daysGenerated,
+    };
+  }
+  if (name === "realtime") {
+    return {
+      success: result.success === true,
+      totalRows: result.totalRows,
+      metricKeys: (result.metrics || []).map((m) => m.metricKey),
+    };
+  }
+  if (name === "public") {
+    return {
+      success: result.success === true,
+      total: result.total,
+      sources: (result.sources || []).map((s) => ({ slug: s.slug, count: s.count })),
+    };
+  }
+  return null;
+}
+
+async function dailyGenerate(req, res, next) {
+  const startedAt = new Date();
+  try {
+    const auth = isAuthorizedVercelCron(req);
+    if (!auth.ok) {
+      return error(res, 401, "Tidak diizinkan: " + auth.reason);
+    }
+
+    const trigger =
+      (req.headers["user-agent"] || "").includes("vercel-cron")
+        ? "vercel_cron"
+        : req.body && req.body.trigger
+        ? String(req.body.trigger)
+        : "manual_api_cron";
+
+    // Jalankan steps secara allSettled agar 1 step gagal tidak menghentikan step lain.
+    // Urutan: dummy -> realtime -> public.
+    const [dummyStep, realtimeStep, publicStep] = await Promise.all([
+      withStep("dummy", () => runDailyDummyNutrition({ trigger, skipLock: true })),
+      withStep("realtime", () => runRealtimeBatch({ trigger })),
+      withStep("public", () => runPublicDataIngest({ trigger })),
+    ]);
+
+    const finishedAt = new Date();
+    const totalMs = finishedAt - startedAt;
+
+    // Catat batch ringkas ke ingest_batch untuk audit.
+    try {
+      await prisma.ingestBatch.create({
+        data: {
+          source: "vercel_cron_daily",
+          fetchedAt: startedAt,
+          generatedAt: finishedAt,
+          timezone: "Asia/Jakarta",
+          qualityFlag: dummyStep.ok && realtimeStep.ok ? "OK" : "PARTIAL",
+          isFallback: false,
+          totalRecords:
+            (dummyStep.summary && dummyStep.summary.totalPorsiGenerated ? dummyStep.summary.totalPorsiGenerated : 0) +
+            (realtimeStep.summary && realtimeStep.summary.totalRows ? realtimeStep.summary.totalRows : 0) +
+            (publicStep.summary && publicStep.summary.total ? publicStep.summary.total : 0),
+          notes: JSON.stringify({
+            trigger,
+            authSource: auth.source,
+            scheduleHeader: req.headers["x-vercel-cron-schedule"] || null,
+            steps: [dummyStep, realtimeStep, publicStep].map((s) => ({
+              name: s.name,
+              ok: s.ok,
+              durationMs: s.durationMs,
+              error: s.error || null,
+            })),
+            totalMs,
+          }),
+        },
+      });
+    } catch (err) {
+      console.error("[cron:daily-generate] gagal catat ingest_batch:", err.message);
+    }
+
+    const allOk = dummyStep.ok && realtimeStep.ok && publicStep.ok;
+    return sukses(
+      res,
+      {
+        ok: allOk,
+        trigger,
+        startedAt: startedAt.toISOString(),
+        finishedAt: finishedAt.toISOString(),
+        totalMs,
+        steps: { dummy: dummyStep, realtime: realtimeStep, public: publicStep },
+      },
+      allOk ? "Sinkronisasi harian berhasil" : "Sinkronisasi harian selesai sebagian"
+    );
+  } catch (err) {
+    return next(err);
+  }
+}
+
+module.exports = { dailyGenerate };

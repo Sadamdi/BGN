@@ -45,3 +45,19 @@ export function syncScrapeData() {
 
   return api.post("/public-data/sync-scrape", null, token ? { params: { token } } : undefined).then((r) => r.data);
 }
+
+// Sinkronisasi data dummy (distribusi + gizi harian). Butuh waktu panjang karena
+// generate 1000 menu dan upsert banyak row, jadi timeout dinaikkan ke 6 menit
+// untuk menghindari axios abort sebelum backend selesai.
+export function syncDummyNutritionData(options = {}) {
+  const totalRecords = options.totalRecords;
+  return api
+    .post("/public-data/sync-dummy-nutrition", totalRecords ? { totalRecords } : {}, { timeout: 360000 })
+    .then((r) => r.data);
+}
+
+// Trigger Vercel Cron handler terpadu (dummy + realtime + public) dari UI.
+// Backend butuh waktu panjang (sampai 5 menit) -> timeout dinaikkan.
+export function triggerDailyCron() {
+  return api.post("/cron/daily-generate", {}, { timeout: 360000 }).then((r) => r.data);
+}

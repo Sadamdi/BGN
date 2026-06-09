@@ -382,7 +382,12 @@ function chooseStatusFromMenu(menu) {
   return "GIZI_BAIK";
 }
 
-async function withJobLock(fn) {
+async function withJobLock(fn, options = {}) {
+  // Untuk Vercel Cron, skip Redis lock: Vercel Cron adalah sumber tunggal harian,
+  // dan Hobby plan tidak menjamin Redis lock atomik lintas cold-start.
+  if (options.skipLock) {
+    return fn();
+  }
   try {
     const redis = getRedis();
     const lockValue = String(Date.now());
@@ -404,7 +409,11 @@ async function withJobLock(fn) {
 
 async function runDailyDummyNutrition(options = {}) {
   const trigger = options.trigger || "cron";
-  const totalMenus = Math.max(1000, Math.min(10000, Number(options.totalMenus) || 1000));
+  // Vercel Cron path: turunkan default totalMenus ke 500 agar < 5 menit.
+  // Trigger manual (klik tombol admin) tetap boleh 1000 sesuai UX awal.
+  const isVercelCron = trigger === "vercel_cron" || trigger === "manual_cron";
+  const defaultMenus = isVercelCron ? 500 : 1000;
+  const totalMenus = Math.max(100, Math.min(10000, Number(options.totalMenus) || defaultMenus));
   const explicitTotalRecords = Number(options.totalRecords);
   const now = dayjs().tz(TZ);
   const runDate = now.startOf("day").toDate();
@@ -415,6 +424,7 @@ async function runDailyDummyNutrition(options = {}) {
     { key: "hari_ini", date: runDate },
     { key: "besok", date: now.add(1, "day").startOf("day").toDate() },
   ];
+  const lockOptions = { skipLock: isVercelCron || options.skipLock === true };
 
   return withJobLock(async () => {
     const [sppgs, recipients, operators, fallbackPetugas] = await Promise.all([
@@ -612,11 +622,57 @@ async function runDailyDummyNutrition(options = {}) {
       }
     }
 
-    await prisma.$transaction(upsertDistribusi, { timeout: 60_000 });
-
-    for (const part of chunk(pemantauanRows, 200)) {
-      await prisma.pemantauanGizi.createMany({ data: part });
+    // Pecah transaksi distribusi per-chunk 25 SPPG agar tidak timeout 60s.
+    // Jalankan paralel per-chunk (max 4 concurrent) untuk total < 5 menit.
+    const DISTRIBUSI_CHUNK = 25;
+    const distribusiChunks = chunk(upsertDistribusi, DISTRIBUSI_CHUNK);
+    const CONCURRENCY = 4;
+    let cursor = 0;
+    async function runDistribusiPool() {
+      const workers = [];
+      for (let w = 0; w < CONCURRENCY; w++) {
+        workers.push((async () => {
+          while (true) {
+            const idx = cursor++;
+            if (idx >= distribusiChunks.length) return;
+            const c = distribusiChunks[idx];
+            try {
+              await prisma.$transaction(c, { timeout: 60_000 });
+            } catch (err) {
+              // Fallback: jalankan satu per satu agar partial failure tidak menggugurkan batch
+              for (const op of c) {
+                try { await op; } catch (e) { console.error("[dummy-nutrition] upsert distribusi gagal:", e.message); }
+              }
+            }
+          }
+        })());
+      }
+      await Promise.all(workers);
     }
+    await runDistribusiPool();
+
+    // Chunk pemantauan lebih kecil + paralel 2 worker agar tidak menumpuk.
+    const PEMANTAUAN_CHUNK = 50;
+    const pemantauanChunks = chunk(pemantauanRows, PEMANTAUAN_CHUNK);
+    let pCursor = 0;
+    async function runPemantauanPool() {
+      const workers = [];
+      for (let w = 0; w < 2; w++) {
+        workers.push((async () => {
+          while (true) {
+            const idx = pCursor++;
+            if (idx >= pemantauanChunks.length) return;
+            try {
+              await prisma.pemantauanGizi.createMany({ data: pemantauanChunks[idx] });
+            } catch (err) {
+              console.error("[dummy-nutrition] createMany pemantauan gagal chunk " + idx + ":", err.message);
+            }
+          }
+        })());
+      }
+      await Promise.all(workers);
+    }
+    await runPemantauanPool();
 
     await prisma.ingestBatch.create({
       data: {

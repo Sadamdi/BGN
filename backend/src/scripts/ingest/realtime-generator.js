@@ -1,8 +1,9 @@
 "use strict";
 
+const path = require("path");
+require("dotenv").config({ path: path.resolve(__dirname, "../../../../.env.local") });
 require("dotenv").config();
 
-const crypto = require("crypto");
 const dayjs = require("dayjs");
 const utc = require("dayjs/plugin/utc");
 const timezone = require("dayjs/plugin/timezone");
@@ -24,7 +25,8 @@ function randomInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-async function generateDailyRealtimeBatch() {
+async function generateDailyRealtimeBatch(options = {}) {
+  const trigger = options.trigger || "generated";
   const nowJakarta = dayjs().tz(TZ);
   const dateJakarta = nowJakarta.startOf("day").toDate();
   const generatedAt = nowJakarta.toDate();
@@ -42,7 +44,7 @@ async function generateDailyRealtimeBatch() {
         source: "generated",
         isFallback: false,
         metadata: {
-          generatedBy: "daily-generator",
+          generatedBy: trigger,
           generatedAtIso: nowJakarta.toISOString(),
         },
       },
@@ -73,26 +75,39 @@ async function generateDailyRealtimeBatch() {
       qualityFlag: "OK",
       isFallback: false,
       totalRecords: inserted.length,
-      notes: "Generator harian realtime metrik MBG (100-10000 per domain).",
+      notes: "Generator harian realtime metrik MBG (100-10000 per domain), trigger=" + trigger + ".",
     },
   });
 
   return inserted;
 }
 
-async function main() {
-  const rows = await generateDailyRealtimeBatch();
-  console.log("[realtime-generator] rows:", rows.length);
-  rows.forEach((r) => {
-    console.log(" -", r.metricKey, "=", r.delta);
-  });
+async function runRealtimeBatch(options = {}) {
+  const trigger = options.trigger || "module_call";
+  const rows = await generateDailyRealtimeBatch({ trigger });
+  return {
+    success: true,
+    trigger,
+    totalRows: rows.length,
+    metrics: rows.map((r) => ({ metricKey: r.metricKey, delta: r.delta })),
+  };
 }
 
-main()
-  .catch((err) => {
-    console.error("[realtime-generator] gagal:", err);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+module.exports = { runRealtimeBatch, generateDailyRealtimeBatch };
+
+if (require.main === module) {
+  (async () => {
+    try {
+      const rows = await generateDailyRealtimeBatch({ trigger: "cli" });
+      console.log("[realtime-generator] rows:", rows.length);
+      rows.forEach((r) => {
+        console.log(" -", r.metricKey, "=", r.delta);
+      });
+    } catch (err) {
+      console.error("[realtime-generator] gagal:", err);
+      process.exit(1);
+    } finally {
+      await prisma.$disconnect();
+    }
+  })();
+}

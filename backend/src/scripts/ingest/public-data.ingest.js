@@ -1,9 +1,10 @@
 "use strict";
 
+const path = require("path");
+require("dotenv").config({ path: path.resolve(__dirname, "../../../../.env.local") });
 require("dotenv").config();
 
 const fs = require("fs/promises");
-const path = require("path");
 const { prisma } = require("../../config/database");
 
 const SOURCES = [
@@ -122,7 +123,7 @@ async function upsertSource(source) {
   });
 }
 
-async function ingestOne(source) {
+async function ingestOne(source, trigger) {
   const sourceRecord = await upsertSource(source);
   const now = new Date();
   const fetchResult = await fetchRemoteOrFallback(source);
@@ -147,6 +148,7 @@ async function ingestOne(source) {
         timezone: "Asia/Jakarta",
         qualityFlag: "OK",
         isFallback: fetchResult.isFallback,
+        trigger,
       },
     }));
 
@@ -167,18 +169,18 @@ async function ingestOne(source) {
       qualityFlag: normalized.length > 0 ? "OK" : "EMPTY",
       isFallback: fetchResult.isFallback,
       totalRecords: normalized.length,
-      notes: "Ingest publik per source",
+      notes: "Ingest publik per source, trigger=" + trigger,
     },
   });
   return { slug: source.slug, count: normalized.length };
 }
 
-async function main() {
+async function runPublicDataIngest(options = {}) {
+  const trigger = options.trigger || "module_call";
   const results = [];
   for (const source of SOURCES) {
-    const r = await ingestOne(source);
+    const r = await ingestOne(source, trigger);
     results.push(r);
-    console.log("[ingest]", source.slug, "=", r.count, "baris");
   }
   const bgnRows = await scrapeBgnValidationBestEffort();
   if (bgnRows.length > 0) {
@@ -188,7 +190,9 @@ async function main() {
       lisensi: "Best Effort Public Web",
       urlSumber: process.env.BGN_VALIDATION_URL || "https://validasidata.bgn.go.id",
     });
-    await prisma.indikatorPublik.deleteMany({ where: { sumberId: source.id, indikator: "TOTAL_PENERIMA_VALIDASI_BGN" } });
+    await prisma.indikatorPublik.deleteMany({
+      where: { sumberId: source.id, indikator: "TOTAL_PENERIMA_VALIDASI_BGN" },
+    });
     await prisma.indikatorPublik.createMany({
       data: bgnRows.map((r) => ({
         sumberId: source.id,
@@ -206,14 +210,22 @@ async function main() {
     results.push({ slug: "bgn_validation_scrape", count: bgnRows.length });
   }
   const total = results.reduce((sum, r) => sum + r.count, 0);
-  console.log("[ingest] total indikator publik:", total);
+  return { success: true, trigger, sources: results, total };
 }
 
-main()
-  .catch((err) => {
-    console.error("[ingest] gagal:", err);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+module.exports = { runPublicDataIngest, SOURCES };
+
+if (require.main === module) {
+  (async () => {
+    try {
+      const result = await runPublicDataIngest({ trigger: "cli" });
+      console.log("[ingest] total indikator publik:", result.total);
+      console.log("[ingest] per source:", JSON.stringify(result.sources, null, 2));
+    } catch (err) {
+      console.error("[ingest] gagal:", err);
+      process.exit(1);
+    } finally {
+      await prisma.$disconnect();
+    }
+  })();
+}

@@ -12,6 +12,17 @@
       "use": "@vercel/node"
     }
   ],
+  "functions": {
+    "backend/api/index.js": {
+      "maxDuration": 300
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/daily-generate",
+      "schedule": "0 17 * * *"
+    }
+  ],
   "routes": [
     {
       "src": "/api/(.*)",
