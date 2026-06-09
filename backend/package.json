@@ -24,6 +24,7 @@
     "seed": "node prisma/seed.js"
   },
   "dependencies": {
+    "@faker-js/faker": "^10.4.0",
     "@prisma/client": "^5.22.0",
     "@sipgn/shared": "1.0.0",
     "bcrypt": "^5.1.1",
@@ -51,7 +52,9 @@
   },
   "jest": {
     "testEnvironment": "node",
-    "testMatch": ["**/__tests__/**/*.test.js"],
+    "testMatch": [
+      "**/__tests__/**/*.test.js"
+    ],
     "collectCoverageFrom": [
       "src/**/*.js",
       "!src/**/__tests__/**",

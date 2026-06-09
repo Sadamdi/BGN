@@ -104,7 +104,7 @@ export default function SppgListPage() {
     { title: "Kab/Kota", dataIndex: "kabupatenKota" },
     { title: "Kapasitas/hari", dataIndex: "kapasitasPorsiPerHari", align: "right" },
     { title: "Penerima Aktif", dataIndex: "jumlahPenerima", align: "right" },
-    { title: "Distribusi Kemarin", dataIndex: "distribusiTerkini", align: "right" },
+    { title: "Distribusi Kemarin", dataIndex: "distribusiTerkini", align: "right", render: (v) => (v == null ? <span style={{ color: "#bbb" }}>-</span> : v) },
     {
       title: "Status",
       dataIndex: "statusAktif",

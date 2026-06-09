@@ -38,7 +38,7 @@ export default function LaporanPage() {
   const isMobile = !screens.md;
   const filterControlStyle = (desktopWidth) => ({ width: isMobile ? "100%" : desktopWidth, maxWidth: "100%" });
   const [jenis, setJenis] = useState("distribusi");
-  const [filter, setFilter] = useState({ periode: [dayjs().subtract(30, "day"), dayjs()], sppgId: null, provinsi: null, kategori: null });
+  const [filter, setFilter] = useState({ periode: [dayjs().subtract(30, "day"), dayjs()], sppgId: null, provinsi: null, kategori: null, page: 1, limit: 25 });
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
   const [sppgOptions, setSppgOptions] = useState([]);
@@ -61,6 +61,8 @@ export default function LaporanPage() {
     sppgId: filter.sppgId || null,
     provinsi: filter.provinsi || null,
     kategori: filter.kategori || null,
+    page: filter.page || 1,
+    limit: filter.limit || 25,
   });
 
   const onPreview = async () => {
@@ -71,6 +73,7 @@ export default function LaporanPage() {
       if (jenis === "distribusi") r = await laporanApi.previewDistribusi(buildBody());
       else if (jenis === "status-gizi") r = await laporanApi.previewStatusGizi(buildBody());
       else if (jenis === "kinerja-sppg") r = await laporanApi.previewKinerjaSppg(buildBody());
+      else if (jenis === "penerima") r = await laporanApi.previewPenerima(buildBody());
       else {
         message.info("Pratinjau belum tersedia untuk tipe laporan ini.");
         setLoading(false);
@@ -82,6 +85,27 @@ export default function LaporanPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const onPageChange = (page, pageSize) => {
+    setFilter((f) => ({ ...f, page, limit: pageSize }));
+    setLoading(true);
+    setPreview(null);
+    (async () => {
+      try {
+        let r;
+        const body = { ...buildBody(), page, limit: pageSize };
+        if (jenis === "distribusi") r = await laporanApi.previewDistribusi(body);
+        else if (jenis === "status-gizi") r = await laporanApi.previewStatusGizi(body);
+        else if (jenis === "kinerja-sppg") r = await laporanApi.previewKinerjaSppg(body);
+        else if (jenis === "penerima") r = await laporanApi.previewPenerima(body);
+        if (r) setPreview(r.data);
+      } catch (err) {
+        message.error((err.response && err.response.data && err.response.data.message) || "Gagal pratinjau");
+      } finally {
+        setLoading(false);
+      }
+    })();
   };
 
   useEffect(() => {
@@ -150,6 +174,16 @@ export default function LaporanPage() {
     { title: "Realisasi %", dataIndex: "realisasiPersen", align: "right" },
     { title: "Menu Hari Ini", dataIndex: "totalMenuHariIni", align: "right" },
     { title: "Energi Hari Ini", dataIndex: "energiHariIni", align: "right" },
+  ];
+
+  const columnsPenerima = [
+    { title: "Nama", dataIndex: "namaLengkap" },
+    { title: "NIK", dataIndex: "nikMasked" },
+    { title: "Kategori", dataIndex: "kategori" },
+    { title: "JK", dataIndex: "jenisKelamin" },
+    { title: "Tgl Lahir", dataIndex: "tanggalLahir", render: (v) => v ? dayjs(v).format("DD/MM/YYYY") : "-" },
+    { title: "SPPG", dataIndex: "sppgNama" },
+    { title: "Provinsi", dataIndex: "sppgProvinsi" },
   ];
 
   return (
@@ -241,7 +275,38 @@ export default function LaporanPage() {
               <Table rowKey={(r) => r.namaLengkap + r.tanggalPengukuran} columns={columnsGizi} dataSource={preview.rows} pagination={false} size="small" scroll={{ x: 800 }} />
             ) : null}
             {preview && jenis === "kinerja-sppg" ? (
-              <Table rowKey={(r) => r.kodeSppg} columns={columnsKinerja} dataSource={preview.rows} pagination={false} size="small" scroll={{ x: 900 }} />
+              <Table
+                rowKey={(r) => r.kodeSppg}
+                columns={columnsKinerja}
+                dataSource={preview.rows}
+                pagination={preview.pagination ? {
+                  current: preview.pagination.page,
+                  pageSize: preview.pagination.limit,
+                  total: preview.pagination.total,
+                  showSizeChanger: true,
+                  showTotal: (t) => `Total ${t} SPPG`,
+                  onChange: onPageChange,
+                } : false}
+                size="small"
+                scroll={{ x: 900 }}
+              />
+            ) : null}
+            {preview && jenis === "penerima" ? (
+              <Table
+                rowKey={(r) => r.id}
+                columns={columnsPenerima}
+                dataSource={preview.rows}
+                pagination={preview.pagination ? {
+                  current: preview.pagination.page,
+                  pageSize: preview.pagination.limit,
+                  total: preview.pagination.total,
+                  showSizeChanger: true,
+                  showTotal: (t) => `Total ${t} penerima`,
+                  onChange: onPageChange,
+                } : false}
+                size="small"
+                scroll={{ x: 900 }}
+              />
             ) : null}
           </Card>
 

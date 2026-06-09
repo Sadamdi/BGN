@@ -88,7 +88,8 @@ async function listSppg(req, res, next) {
       latitude: s.latitude ? Number(s.latitude) : null,
       longitude: s.longitude ? Number(s.longitude) : null,
       jumlahPenerima: s._count.penerimaManfaat,
-      distribusiTerkini: distMap.get(s.id) || 0,
+      // null saat belum ada distribusi kemarin (jangan tampil 0 yang misleading).
+      distribusiTerkini: distMap.has(s.id) ? distMap.get(s.id) : null,
       _count: undefined,
     }));
 
