@@ -98,9 +98,10 @@ function tanggalLahirFor(kategori, idx) {
 }
 
 function pickPenerimaCount(sppgId) {
-  // 30-100 penerima per SPPG (deterministic).
+  // 12-20 penerima per SPPG (deterministic). Cukup untuk dashboard
+  // tampil angka realistis tanpa timeout di Vercel Hobby (5 menit).
   const h = fnv1a(sppgId + "|n");
-  return 30 + (h % 71);
+  return 12 + (h % 9);
 }
 
 async function backfillKapasitas(sppgs) {
@@ -120,36 +121,39 @@ async function backfillPenerimaForSppg(sppg) {
   const target = pickPenerimaCount(sppg.id);
   if (existing >= target) return 0;
   const need = target - existing;
-  let inserted = 0;
+
+  // Bangun batch rows untuk semua penerima yang belum ada (1x query, 1x insert).
+  const rows = [];
   for (let i = 0; i < need; i++) {
     const idx = existing + i;
     const kategori = pickKategori(idx);
     const jenisKelamin = pickJenisKelamin(kategori, idx);
-    // NIK seed = fnv(sppgId) ^ idx -> unik per SPPG + per penerima
     const seedNik = fnv1a(sppg.id + "|nik|" + idx);
     const nik = generateNik(seedNik);
     const namaLengkap = generateNamaPenerima("penerima-" + sppg.id + "-" + idx, jenisKelamin);
     const tglLahir = tanggalLahirFor(kategori, idx);
-    try {
-      await prisma.penerimaManfaat.create({
-        data: {
-          nikEnc: encryptText(nik),
-          nikHash: hashNik(nik),
-          nikMasked: maskNik(nik),
-          namaLengkap: namaLengkap,
-          tanggalLahir: tglLahir,
-          jenisKelamin: jenisKelamin,
-          kategori: kategori,
-          satuanPendidikan: kategori === "PESERTA_DIDIK" ? "SDN " + (idx % 12 + 1) + " " + sppg.kabupatenKota : null,
-          sppgId: sppg.id,
-        },
-      });
-      inserted += 1;
-    } catch (e) {
-      if (e.code !== "P2002") throw e;
-    }
+    rows.push({
+      nikEnc: encryptText(nik),
+      nikHash: hashNik(nik),
+      nikMasked: maskNik(nik),
+      namaLengkap: namaLengkap,
+      tanggalLahir: tglLahir,
+      jenisKelamin: jenisKelamin,
+      kategori: kategori,
+      satuanPendidikan: kategori === "PESERTA_DIDIK" ? "SDN " + (idx % 12 + 1) + " " + sppg.kabupatenKota : null,
+      sppgId: sppg.id,
+    });
   }
-  return inserted;
+  try {
+    const result = await prisma.penerimaManfaat.createMany({
+      data: rows,
+      skipDuplicates: true, // aman untuk retry
+    });
+    return result.count;
+  } catch (e) {
+    console.error("[sppg-backfill] createMany gagal untuk", sppg.kodeSppg, ":", e.message);
+    return 0;
+  }
 }
 
 async function main() {
