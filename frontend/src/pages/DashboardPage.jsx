@@ -286,17 +286,30 @@ export default function DashboardPage() {
     setBackfill30dLoading(true);
     setError(null);
     try {
-      const r = await publicDataApi.backfill30d(30);
-      const data = r && r.data;
-      if (data) {
-        setLastSyncSummary({
-          jenis: "backfill_30d",
-          ok: data.ok,
-          backfillDays: data.backfillDays,
-          totalMs: data.totalMs,
-          steps: data.steps,
-          trigger: data.trigger,
-        });
+      // Run backfill in chunks of 7 days to avoid Vercel Hobby timeout (5 min limit)
+      const CHUNK_DAYS = 7;
+      const TOTAL_DAYS = 30;
+      let allOk = true;
+      let totalMs = 0;
+      let allSteps = {};
+      
+      for (let i = 0; i < TOTAL_DAYS; i += CHUNK_DAYS) {
+        const days = Math.min(CHUNK_DAYS, TOTAL_DAYS - i);
+        const r = await publicDataApi.backfill30d(days);
+        const data = r && r.data;
+        if (data) {
+          allOk = allOk && data.ok;
+          totalMs += data.totalMs || 0;
+          allSteps["chunk_" + i] = data.steps;
+          setLastSyncSummary({
+            jenis: "backfill_30d",
+            ok: allOk,
+            backfillDays: i + days,
+            totalMs,
+            steps: allSteps,
+            trigger: data.trigger,
+          });
+        }
       }
       await fetchAll();
     } catch (err) {
@@ -325,13 +338,22 @@ export default function DashboardPage() {
         steps: data.steps,
         trigger: data.trigger,
       });
-      // Setelah reset, langsung populate data baru dengan mode realistic
-      message.success("Reset selesai. Memulai backfill realistic 30 hari...");
-      const r2 = await publicDataApi.backfill30d(30);
-      const d2 = r2 && r2.data;
+      // Setelah reset, langsung populate data baru (chunked 7 hari sekali)
+      message.success("Reset selesai. Memulai backfill 30 hari...");
+      const CHUNK_DAYS = 7;
+      const TOTAL_DAYS = 30;
+      let allOk = true;
+      let totalMs = 0;
+      for (let i = 0; i < TOTAL_DAYS; i += CHUNK_DAYS) {
+        const days = Math.min(CHUNK_DAYS, TOTAL_DAYS - i);
+        const r2 = await publicDataApi.backfill30d(days);
+        const d2 = r2 && r2.data;
+        if (d2) allOk = allOk && d2.ok;
+        totalMs += d2?.totalMs || 0;
+      }
       setLastSyncSummary((prev) => ({
         ...(prev || {}),
-        backfill: { ok: d2.ok, backfillDays: d2.backfillDays, totalMs: d2.totalMs, steps: d2.steps },
+        backfill: { ok: allOk, backfillDays: TOTAL_DAYS, totalMs },
       }));
       await fetchAll();
     } catch (err) {
