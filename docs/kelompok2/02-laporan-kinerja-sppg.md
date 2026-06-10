@@ -116,5 +116,8 @@ A: Awalnya karena `buildCategoryAllocation` deterministic (seeded by `sppgId|dat
 **Q: Mengapa pakai fallback menu snapshot kalau DB kosong?**
 A: Safety net agar Laporan Kinerja tidak kosong sebelum cron harian jalan. `buildSyntheticMenuSnapshotForSppg` deterministic per SPPG (seed `hashString(sppgId)`) sehingga menu realistis per SPPG. Setelah cron jalan, fallback tidak terpakai.
 
+**Q: Kenapa distribusi hari ini 0 di dashboard?**
+A: Timezone mismatch antara server UTC dan generator WIB. Sudah fix di `dateRange.js` dengan `dayjs().tz("Asia/Jakarta")`. Kalau masih 0 setelah deploy, trigger "Backfill 30 Hari (Realistis)" di dashboard. Cek juga file [backend/src/utils/dateRange.js](../../backend/src/utils/dateRange.js).
+
 **Q: Export Excel kenapa perlu format khusus?**
 A: REQ-6.2: header BGN biru (#1B3A6B), 2 desimal, filename `LaporanSIPGN_{Jenis}_{Wilayah}_{YYYYMMDD}.xlsx`. `excel.service.js` punya helper `applyBGNHeaderStyle()` & generator per-jenis.

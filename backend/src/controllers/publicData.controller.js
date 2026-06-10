@@ -2,6 +2,7 @@
 
 const { prisma } = require("../config/database");
 const { sukses } = require("../utils/response");
+const { startOfDay } = require("../utils/dateRange");
 const { runBgnScrapeSync } = require("../services/bgnScrapeSync.service");
 const { runDailyDummyNutrition } = require("../services/dummyNutrition.service");
 
@@ -29,11 +30,12 @@ async function getRingkasanPublik(req, res, next) {
 
 async function getRealtimeSummary(_req, res, next) {
   try {
-    const today = new Date();
+    // Pakai startOfDay (WIB) supaya sinkron dengan timezone generator.
+    const todayWib = startOfDay(new Date());
     const metrics = await prisma.realtimeMetric.findMany({
       where: {
         dateJakarta: {
-          gte: new Date(today.getFullYear(), today.getMonth(), today.getDate()),
+          gte: todayWib,
         },
       },
       orderBy: { createdAt: "desc" },

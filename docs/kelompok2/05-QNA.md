@@ -101,6 +101,12 @@ A: Karena data riil BGN tidak tersedia untuk development/demo, kami generate dat
 **Q: Kenapa mode realistic vs absurdly_high?**
 A: Mode realistic (default cron harian): nasional 1.000-1.000.000 porsi/hari, representatif produksi. Mode absurdly_high: util 35-90% kapasitas, chart besar untuk demo visual presentasi.
 
+**Q: Kenapa distribusi hari ini bisa 0 padahal data ada?**
+A: Ini masalah timezone mismatch. Server Vercel region `iad1` berjalan di UTC, sedangkan generator menyimpan data dalam timezone Asia/Jakarta (WIB). Sebelum fix, `startOfDay(new Date())` di server UTC menghasilkan midnight UTC (`2026-06-10T00:00:00Z`), sedangkan row distribusi 10 Juni WIB disimpan sebagai `2026-06-09T17:00:00Z` (UTC). Keduanya tidak match. Fix: `dateRange.js` diubah agar `startOfDay`, `endOfDay`, `rangeArray` selalu konversi ke WIB dulu sebelum ambil midnight, sehingga `startOfDay(now)` = `2026-06-09T17:00:00Z` (awal hari WIB) = same as generator.
+
+**Q: Kenapa tren 30 hari tidak penuh (banyak hari 0)?**
+A: Cron Vercel Hobby limit 1x/hari — hanya generate 3 slice (kemarin/hari ini/besok). Historis 30 hari ke belakang harus di-backfill manual: klik tombol **Backfill 30 Hari (Realistis)** di dashboard, atau **Reset Data Dummy** (yang otomatis trigger backfill). Setelah itu cron harian otomatis extend satu hari ke depan setiap hari.
+
 ---
 
 ## Testing
