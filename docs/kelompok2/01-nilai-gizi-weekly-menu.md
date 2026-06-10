@@ -63,6 +63,7 @@ Fitur ini memungkinkan SPPG untuk:
 - **Handler**: [backend/src/controllers/cron.controller.js](../../backend/src/controllers/cron.controller.js)
 - **Mode realistic** (default cron): nasional 1.000-1.000.000 porsi/hari
 - **Mode absurdly_high** (default UI trigger): util 35-90% kapasitas (chart besar untuk demo)
+- **Timezone**: semua query tanggal pakai `dayjs().tz("Asia/Jakarta")` via [backend/src/utils/dateRange.js](../../backend/src/utils/dateRange.js) agar sinkron antara generator WIB dan query server UTC.
 - **Steps paralel**: dummy + realtime + public via `Promise.allSettled` (1 gagal tidak stop step lain)
 
 ---

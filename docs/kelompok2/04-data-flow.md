@@ -90,7 +90,10 @@ flowchart TB
 
 1. **Single source of truth**: `distribusi_mbg`, `pemantauan_gizi`, `penerima_manfaat` di PostgreSQL. Tidak ada duplikasi.
 2. **Cache invalidation**: `cron.controller.js` panggil `invalidatePrefix("dashboard:")` & `invalidatePrefix("laporan:")` setelah trigger generator. Cache TTL 5 menit. Setelah deploy, refresh browser = data konsisten.
-3. **Timezone konsistensi**: Cron pakai `dayjs().tz("Asia/Jakarta")` untuk konsistensi antar SPPG timezone. Query distribusi pakai window 2 hari (UTC + Jakarta) untuk toleransi.
+3. **Timezone standarisasi WIB**: `dateRange.js` pakai `dayjs().tz("Asia/Jakarta")` di `startOfDay()`, `endOfDay()`, `rangeArray()`. Server Vercel region `iad1` (UTC), tapi semua query tanggal di-normalize ke WIB sehingga:
+   - Generator insert row 10 Juni WIB = `2026-06-09T17:00:00.000Z` (UTC)
+   - Dashboard query `startOfDay(new Date())` = `2026-06-09T17:00:00.000Z` (UTC) (karena startOfDay dikonversi ke WIB dulu)
+   - **MATCH** -> distribusiHariIni terisi.
 4. **Idempotent upsert**: distribusi_mbg pakai unique `[sppgId, tanggalDistribusi]` + `upsert`. Backfill aman di-rerun.
 5. **Skip duplicates**: createMany dengan `skipDuplicates: true` untuk penerima backfill.
 

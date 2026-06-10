@@ -1,18 +1,31 @@
 "use strict";
 
 const dayjs = require("dayjs");
+const utc = require("dayjs/plugin/utc");
+const timezone = require("dayjs/plugin/timezone");
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+// Standarisasi timezone ke WIB (Asia/Jakarta) untuk SEMUA query tanggal.
+// Server Vercel region iad1 jalan di UTC, tapi data distribusi & pemantauan
+// disimpan dengan reference timezone WIB. Tanpa standarisasi ini,
+// query `startOfDay(new Date())` di server UTC = midnight UTC (07:00 WIB),
+// sedangkan row distribusi 10 Juni WIB = 2026-06-09T17:00:00.000Z (UTC).
+// Hasilnya: distribusiHariIni = 0 padahal data ada.
+const TZ = "Asia/Jakarta";
 
 function startOfDay(d) {
-  return dayjs(d).startOf("day").toDate();
+  return dayjs(d).tz(TZ).startOf("day").toDate();
 }
 
 function endOfDay(d) {
-  return dayjs(d).endOf("day").toDate();
+  return dayjs(d).tz(TZ).endOf("day").toDate();
 }
 
 function rangeArray(days) {
   const out = [];
-  const today = dayjs().startOf("day");
+  const today = dayjs().tz(TZ).startOf("day");
   for (let i = days - 1; i >= 0; i--) {
     out.push(today.subtract(i, "day").format("YYYY-MM-DD"));
   }

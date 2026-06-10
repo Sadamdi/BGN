@@ -65,13 +65,13 @@ FAQ untuk issue yang sering muncul di development/production. Disusun berdasarka
 - Naikkan plan ke Pro (maxDuration 800s, 8x concurrent).
 - Tambah index pada `distribusi_mbg(sppgId, tanggalDistribusi) WHERE tanggalDistribusi >= ?` (partial index).
 
-### Tren distribusi flat 0 sebelum tanggal tertentu
+### Tren 30 hari kosong sebelum tanggal tertentu
 
-**Gejala**: Chart tren distribusi kosong sebelum tanggal 7 Juni.
+**Gejala**: Chart tren distribusi kosong sebelum tanggal X.
 
-**Penyebab**: Cron baru generate 3 slice (kemarin/hari ini/besok). Historis 30 hari lalu belum ada row distribusi.
+**Penyebab**: Generator baru jalan generate 3 slice (kemarin/hari ini/besok). Historis 30 hari sebelumnya belum pernah di-generate.
 
-**Solusi**: Klik **Backfill 30 Hari (Realistis)** di dashboard. Tunggu ±1-3 menit (Vercel cold start + query). Refresh browser.
+**Solusi**: Klik **Backfill 30 Hari (Realistis)** di dashboard. Atau klik **Reset Data Dummy** (double-confirm) yang otomatis trigger backfill 30 hari. Tunggu 1-3 menit.
 
 ### Nama "Dummy PESERTA DIDIK 1-1" di laporan
 
@@ -85,23 +85,20 @@ FAQ untuk issue yang sering muncul di development/production. Disusun berdasarka
 
 ## Sinkronisasi Data
 
-### Dashboard "Distribusi Hari Ini" 0 padahal trend terisi
+### Dashboard "Distribusi Hari Ini" 0 padahal tren terisi
 
-**Penyebab**: Cache TTL 5 menit. Backend set di `dashboard.controller.js:30` `getOrSet(..., 300, ...)`. Tunggu 5 menit atau restart Vercel function (cold start clear cache).
+**Root Cause (paling umum)**: Timezone mismatch. Server Vercel region `iad1` jalan di UTC. Generator `dummyNutrition.service.js` menyimpan `tanggalDistribusi` dalam timezone Asia/Jakarta (WIB). Query dashboard lama pakai `new Date()` (UTC).
 
-**Solusi**: Sudah ditambah `invalidatePrefix("dashboard:")` & `invalidatePrefix("laporan:")` di `cron.controller.js` setelah trigger. Jadi setelah tombol Generate / Backfill / Trigger Cron, data langsung konsisten.
+Contoh 10 Juni pukul 08:00 WIB:
+- Generator insert tanggal distribusi 10 Juni WIB → `2026-06-09T17:00:00.000Z` (UTC)
+- Query `startOfDay(new Date())` server UTC → `2026-06-10T00:00:00.000Z`
+- **Tidak match** → distribusiHariIni = 0
 
-### SPPG page "Distribusi Kemarin" 0 padahal distribusi ada
+**Solusi (sudah fix)**: `dateRange.js` menggunakan `dayjs().tz("Asia/Jakarta")` di `startOfDay()`, `endOfDay()`, `rangeArray()`. Lihat [backend/src/utils/dateRange.js](../../backend/src/utils/dateRange.js).
 
-**Penyebab**: Query `tanggalDistribusi: yest` tapi row disimpan di timezone Asia/Jakarta (9 Juni WIB = 8 Juni 17:00 UTC).
+**Solusi tambahan**: Cache TTL 5 menit — tambah `invalidatePrefix("dashboard:")` setelah trigger generator. Setelah tombol Generate/Backfill/Trigger Cron, data langsung konsisten.
 
-**Solusi**: Sudah fix di `sppg.controller.js:listSppg` & `dashboard.controller.js:getSebaranSppg` pakai window 2 hari (UTC + Jakarta) untuk toleransi.
-
-### `Rata-rata Realisasi` 53.31% semua SPPG sama
-
-**Penyebab**: Generator deterministic per-tanggal, tidak per-SPPG.
-
-**Solusi**: Sudah fix — `buildCategoryAllocation` ada per-SPPG jitter. Backfill lagi untuk lihat variasi baru.
+### Tren 30 hari kosong sebelum tanggal tertentu
 
 ---
 
