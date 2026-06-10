@@ -1,4 +1,4 @@
-"use strict";
+﻿"use strict";
 
 const express = require("express");
 const router = express.Router();
@@ -69,7 +69,7 @@ router.post("/reset-distribusi", async (req, res, next) => {
   }
 });
 
-router.post("/backfill-realistic", async (req, res, next) => {
+router.post("/backfill-30d", async (req, res, next) => {
   const startedAt = new Date();
   try {
     const backfillDays = Math.max(1, Math.min(60, parseInt(req.body && req.body.backfillDays, 10) || 30));
