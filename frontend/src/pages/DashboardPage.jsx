@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useMemo } from "react";
+﻿import React, { useEffect, useRef, useState, useMemo } from "react";
 import {
   Row,
   Col,
@@ -95,10 +95,8 @@ export default function DashboardPage() {
   const [syncLoading, setSyncLoading] = useState(false);
   const [syncDummyLoading, setSyncDummyLoading] = useState(false);
   const [syncCronLoading, setSyncCronLoading] = useState(false);
-  const [backfillSppgLoading, setBackfillSppgLoading] = useState(false);
   const [backfill30dLoading, setBackfill30dLoading] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
-  const [backfillRealisticLoading, setBackfillRealisticLoading] = useState(false);
   const [lastSyncSummary, setLastSyncSummary] = useState(null);
 
   const fetchAll = async () => {
@@ -263,7 +261,7 @@ export default function DashboardPage() {
     setBackfillSppgLoading(true);
     setError(null);
     try {
-      const r = await publicDataApi.backfillSppg();
+      const r = await publicDataApi.backfill30d(30);
       const data = r && r.data;
       if (data) {
         setLastSyncSummary({
@@ -329,7 +327,7 @@ export default function DashboardPage() {
       });
       // Setelah reset, langsung populate data baru dengan mode realistic
       message.success("Reset selesai. Memulai backfill realistic 30 hari...");
-      const r2 = await publicDataApi.backfillRealistic(30);
+      const r2 = await publicDataApi.backfill30d(30);
       const d2 = r2 && r2.data;
       setLastSyncSummary((prev) => ({
         ...(prev || {}),
@@ -349,7 +347,7 @@ export default function DashboardPage() {
     setBackfillRealisticLoading(true);
     setError(null);
     try {
-      const r = await publicDataApi.backfillRealistic(30);
+      const r = await publicDataApi.backfill30d(30);
       const data = r && r.data;
       if (data) {
         setLastSyncSummary({
@@ -408,29 +406,13 @@ export default function DashboardPage() {
                   Trigger Cron (Semua)
                 </Button>
                 <Button
-                  icon={<SyncOutlined spin={backfillSppgLoading} />}
-                  onClick={onBackfillSppg}
-                  loading={backfillSppgLoading}
-                >
-                  Backfill SPPG
-                </Button>
-                <Button
-                  type="primary"
-                  ghost
-                  icon={<SyncOutlined spin={backfillRealisticLoading} />}
-                  onClick={onBackfillRealistic}
-                  loading={backfillRealisticLoading}
-                >
-                  Backfill 30 Hari (Realistis)
-                </Button>
-                <Button
                   type="primary"
                   ghost
                   icon={<SyncOutlined spin={backfill30dLoading} />}
                   onClick={onBackfill30d}
                   loading={backfill30dLoading}
                 >
-                  Backfill 30 Hari (Demo)
+                  Backfill 30 Hari
                 </Button>
                 {hasRole("ADMIN") ? (
                   <Button
@@ -469,28 +451,28 @@ export default function DashboardPage() {
           description={
             lastSyncSummary.jenis === "cron" ? (
               <div>
-                <div>Trigger: <b>{lastSyncSummary.trigger}</b> · Total: <b>{Math.round((lastSyncSummary.totalMs || 0) / 1000)}s</b></div>
+                <div>Trigger: <b>{lastSyncSummary.trigger}</b> Â· Total: <b>{Math.round((lastSyncSummary.totalMs || 0) / 1000)}s</b></div>
                 <ul style={{ margin: "6px 0 0 16px" }}>
                   {Object.entries(lastSyncSummary.steps || {}).map(([k, s]) => (
                     <li key={k}>
                       <b>{k}</b>: {s.ok ? "OK" : "GAGAL"} ({Math.round((s.durationMs || 0) / 1000)}s)
                       {s.summary ? (
                         <span style={{ color: "#888" }}>
-                          {s.summary.totalPorsiGenerated != null ? ` · porsi hari ini: ${s.summary.totalPorsiGenerated}` : ""}
-                          {s.summary.totalRows != null ? ` · rows: ${s.summary.totalRows}` : ""}
-                          {s.summary.total != null ? ` · indikator: ${s.summary.total}` : ""}
+                          {s.summary.totalPorsiGenerated != null ? ` Â· porsi hari ini: ${s.summary.totalPorsiGenerated}` : ""}
+                          {s.summary.totalRows != null ? ` Â· rows: ${s.summary.totalRows}` : ""}
+                          {s.summary.total != null ? ` Â· indikator: ${s.summary.total}` : ""}
                         </span>
                       ) : null}
-                      {s.error ? <span style={{ color: "#ff4d4f" }}> · {s.error}</span> : null}
+                      {s.error ? <span style={{ color: "#ff4d4f" }}> Â· {s.error}</span> : null}
                     </li>
                   ))}
                 </ul>
               </div>
             ) : (
               <div>
-                <div>Trigger: <b>{lastSyncSummary.trigger}</b> · SPPG diupdate: <b>{lastSyncSummary.totalSppgUpdated}</b> · Pemantauan: <b>{lastSyncSummary.totalPemantauanInserted}</b></div>
+                <div>Trigger: <b>{lastSyncSummary.trigger}</b> Â· SPPG diupdate: <b>{lastSyncSummary.totalSppgUpdated}</b> Â· Pemantauan: <b>{lastSyncSummary.totalPemantauanInserted}</b></div>
                 <div style={{ marginTop: 4 }}>
-                  Porsi kemarin: <b>{lastSyncSummary.totalPorsiKemarin}</b> · hari ini: <b>{lastSyncSummary.totalPorsiGenerated}</b> · besok: <b>{lastSyncSummary.totalPorsiBesok}</b>
+                  Porsi kemarin: <b>{lastSyncSummary.totalPorsiKemarin}</b> Â· hari ini: <b>{lastSyncSummary.totalPorsiGenerated}</b> Â· besok: <b>{lastSyncSummary.totalPorsiBesok}</b>
                 </div>
               </div>
             )

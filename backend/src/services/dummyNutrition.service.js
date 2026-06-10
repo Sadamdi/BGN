@@ -1,4 +1,4 @@
-"use strict";
+﻿"use strict";
 
 const dayjs = require("dayjs");
 const utc = require("dayjs/plugin/utc");
@@ -350,7 +350,7 @@ function buildCategoryAllocation(sppg, date, total) {
   })();
 
   // Base proporsi (total = 1.0): PESERTA_DIDIK 55%, BALITA 25%, IBU_HAMIL 10%, IBU_MENYUSUI 10%.
-  // Tambah jitter ±5% per kategori, lalu normalize.
+  // Tambah jitter Â±5% per kategori, lalu normalize.
   const base = { PESERTA_DIDIK: 0.55, BALITA: 0.25, IBU_HAMIL: 0.1, IBU_MENYUSUI: 0.1 };
   const jitter = () => (rng() - 0.5) * 0.1;
   const raw = {
@@ -798,7 +798,7 @@ async function runDailyDummyNutrition(options = {}) {
       daysGenerated: ["kemarin", "hari_ini", "besok"],
       weekKeys: Array.from(weekKeys),
     };
-  });
+  }, lockOptions);
 }
 
 function buildSyntheticMenuSnapshotForSppg({ sppgId, date = new Date(), totalMenus = 1000 }) {
@@ -827,3 +827,4 @@ module.exports = {
   buildCategoryAllocation,
   generateNamaPenerima,
 };
+

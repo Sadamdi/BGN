@@ -1,4 +1,4 @@
-import api from "./axios";
+﻿import api from "./axios";
 import { useAuthStore } from "../store/authStore";
 
 export function getRingkasanPublik(tahun) {
@@ -30,9 +30,6 @@ export function createRealtimeStream(onEvent, onError) {
 }
 
 export function syncScrapeData() {
-  // Backend `verifyToken` baca token dari `Authorization` header atau dari query param `token`.
-  // Untuk menghindari kasus token header tidak ke-set (mis. state store belum terhidrasi),
-  // kirim juga token via query param sebagai fallback.
   const accessToken = useAuthStore.getState().accessToken;
   const token = accessToken || (() => {
     try {
@@ -46,9 +43,6 @@ export function syncScrapeData() {
   return api.post("/public-data/sync-scrape", null, token ? { params: { token } } : undefined).then((r) => r.data);
 }
 
-// Sinkronisasi data dummy (distribusi + gizi harian). Butuh waktu panjang karena
-// generate 1000 menu dan upsert banyak row, jadi timeout dinaikkan ke 6 menit
-// untuk menghindari axios abort sebelum backend selesai.
 export function syncDummyNutritionData(options = {}) {
   const totalRecords = options.totalRecords;
   return api
@@ -56,22 +50,10 @@ export function syncDummyNutritionData(options = {}) {
     .then((r) => r.data);
 }
 
-// Trigger Vercel Cron handler terpadu (dummy + realtime + public) dari UI.
-// Backend butuh waktu panjang (sampai 5 menit) -> timeout dinaikkan.
 export const triggerDailyCron = () => api.post("/cron/daily-generate", {}, { timeout: 360000 }).then((r) => r.data);
 
-// Backfill SPPG (kapasitas realistis + penerima dummy). Bisa sampai 10 menit (3354 SPPG).
-export const backfillSppg = () => api.post("/cron/backfill-sppg", {}, { timeout: 600000 }).then((r) => r.data);
-
-// Backfill 30 hari distribusi + realtime + public.
 export const backfill30d = (backfillDays = 30) =>
-  api.post("/cron/backfill-30d", { backfillDays }, { timeout: 600000 }).then((r) => r.data);
+  api.post("/admin/backfill-30d", { backfillDays }, { timeout: 600000 }).then((r) => r.data);
 
-// Admin: reset distribusi dummy (hapus distribusi_mbg, pemantauan_gizi,
-// realtime_metric, realtime_event_stream, ingest_batch). Idempotent.
 export const resetDistribusi = (mode = "all") =>
   api.post("/admin/reset-distribusi", { mode }, { timeout: 60000 }).then((r) => r.data);
-
-// Admin: backfill 30 hari mode realistic (nasional 1rb-1jt/hari).
-export const backfillRealistic = (backfillDays = 30) =>
-  api.post("/admin/backfill-realistic", { backfillDays }, { timeout: 600000 }).then((r) => r.data);
