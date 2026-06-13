@@ -172,6 +172,57 @@ async function toggleStatus(req, res, next) {
   }
 }
 
+async function approvePendaftaran(req, res, next) {
+  try {
+    const id = req.params.id;
+    const u = await prisma.pengguna.findUnique({ where: { id } });
+    if (!u) throw new HttpError(404, "Pengguna tidak ditemukan", "NOT_FOUND");
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const user = await tx.pengguna.update({ where: { id }, data: { statusAktif: true } });
+      if (user.sppgId) {
+        await tx.sppg.update({ where: { id: user.sppgId }, data: { statusAktif: true } });
+      }
+      return user;
+    });
+
+    await catatAudit({ tabel: "pengguna", recordId: id, aksi: "UPDATE", dataLama: { statusAktif: false }, dataBaru: { statusAktif: true, approved: true }, req });
+    emailWelcome({ to: updated.email, namaLengkap: updated.namaLengkap, username: updated.username, password: "(gunakan password saat registrasi)" }).catch(() => {});
+    return sukses(res, publicUser(updated), "Pendaftaran SPPG disetujui");
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function tolakPendaftaran(req, res, next) {
+  try {
+    const id = req.params.id;
+    const u = await prisma.pengguna.findUnique({ where: { id } });
+    if (!u) throw new HttpError(404, "Pengguna tidak ditemukan", "NOT_FOUND");
+    if (u.statusAktif) throw new HttpError(422, "Hanya pendaftaran yang belum aktif dapat ditolak", "ALREADY_ACTIVE");
+
+    const sppgId = u.sppgId;
+    await prisma.$transaction(async (tx) => {
+      await tx.pengguna.delete({ where: { id } });
+      if (sppgId) {
+        // Hapus SPPG hasil registrasi hanya bila tidak punya penerima/distribusi & masih nonaktif.
+        const sppg = await tx.sppg.findUnique({
+          where: { id: sppgId },
+          include: { _count: { select: { penerimaManfaat: true, distribusiMbg: true, pengguna: true } } },
+        });
+        if (sppg && !sppg.statusAktif && sppg._count.penerimaManfaat === 0 && sppg._count.distribusiMbg === 0 && sppg._count.pengguna === 0) {
+          await tx.sppg.delete({ where: { id: sppgId } });
+        }
+      }
+    });
+
+    await catatAudit({ tabel: "pengguna", recordId: id, aksi: "DELETE", dataLama: publicUser(u), dataBaru: { ditolak: true }, req });
+    return sukses(res, null, "Pendaftaran SPPG ditolak");
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function hapusPengguna(req, res, next) {
   try {
     const id = req.params.id;
@@ -211,5 +262,7 @@ module.exports = {
   updatePengguna,
   resetPasswordOleh,
   toggleStatus,
+  approvePendaftaran,
+  tolakPendaftaran,
   hapusPengguna,
 };

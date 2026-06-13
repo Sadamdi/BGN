@@ -5,10 +5,11 @@ const router = express.Router();
 
 const ctrl = require("../controllers/auth.controller");
 const { verifyToken } = require("../middleware/auth");
-const { loginLimiter } = require("../middleware/rateLimiter");
+const { loginLimiter, registerLimiter } = require("../middleware/rateLimiter");
 
 router.get("/login", ctrl.getLoginInfo);
 router.post("/login", loginLimiter, ctrl.postLogin);
+router.post("/register-sppg", registerLimiter, ctrl.postRegisterSppg);
 router.post("/refresh", ctrl.postRefresh);
 router.post("/logout", verifyToken, ctrl.postLogout);
 router.post("/forgot-password", ctrl.postForgotPassword);

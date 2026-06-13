@@ -10,6 +10,7 @@ const { invalidatePrefix } = require("../services/cache.service");
 const notif = require("../services/notifikasi.service");
 const { buildSppgFilter } = require("../middleware/rbac");
 const { parsePagination, buildPaginationMeta } = require("../utils/pagination");
+const { AKG_TABEL, PORSI_AKG_MBG, hitungPemenuhanAKG } = require("../data/akg-standar");
 
 function usiaBulanFrom(tanggalLahir, tanggalUkur) {
   return dayjs(tanggalUkur).diff(dayjs(tanggalLahir), "month");
@@ -97,7 +98,13 @@ async function buatPemantauan(req, res, next) {
         .catch(() => {});
     }
 
-    return sukses(res, { ...created, klasifikasi: klas, zscore: z }, "Pemantauan gizi tersimpan", 201);
+    const akg = hitungPemenuhanAKG({ kategori: penerima.kategori, usiaBulan });
+    return sukses(
+      res,
+      { ...created, klasifikasi: klas, zscore: z, akg: akg ? { kategori: penerima.kategori, standar: akg.standar, targetPorsi: akg.targetPorsi } : null },
+      "Pemantauan gizi tersimpan",
+      201
+    );
   } catch (err) {
     next(err);
   }
@@ -199,4 +206,19 @@ async function prevalensi(req, res, next) {
   }
 }
 
-module.exports = { buatPemantauan, riwayatPenerima, prevalensi };
+async function standarAKG(req, res, next) {
+  try {
+    return sukses(res, {
+      porsiAkgMbg: PORSI_AKG_MBG,
+      keterangan:
+        "Nilai AKG harian per orang. Satu porsi MBG menargetkan ~" +
+        Math.round(PORSI_AKG_MBG * 100) +
+        "% AKG harian.",
+      tabel: AKG_TABEL,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { buatPemantauan, riwayatPenerima, prevalensi, standarAKG };

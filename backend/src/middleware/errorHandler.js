@@ -51,6 +51,7 @@ function errorHandler(err, req, res, _next) {
       success: false,
       message: err.message || "Terjadi kesalahan",
       code: err.code || "ERROR",
+      ...(err.fields ? { fields: err.fields } : {}),
     });
   }
 
@@ -65,11 +66,12 @@ function errorHandler(err, req, res, _next) {
 }
 
 class HttpError extends Error {
-  constructor(status, message, code) {
+  constructor(status, message, code, fields) {
     super(message);
     this.statusCode = status;
     this.code = code || "ERROR";
     this.expose = true;
+    if (fields) this.fields = fields;
   }
 }
 

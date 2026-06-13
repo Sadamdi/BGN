@@ -9,6 +9,7 @@ const { getRedis } = require("../config/redis");
 const { ACCESS_SECRET, REFRESH_SECRET, ACCESS_EXPIRES, REFRESH_EXPIRES } = require("../config/jwt");
 const { HttpError } = require("../middleware/errorHandler");
 const { emailResetPassword } = require("./email.service");
+const { sanitizeString } = require("../utils/sanitize");
 
 const FAIL_TTL = 15 * 60;
 const LOCKOUT_TTL = 15 * 60;
@@ -182,6 +183,123 @@ async function login({ identifier, password }) {
   };
 }
 
+function validateRegisterPassword(p) {
+  if (!p || p.length < 8) return "Password minimal 8 karakter";
+  if (!/[A-Z]/.test(p)) return "Password harus mengandung huruf besar";
+  if (!/[a-z]/.test(p)) return "Password harus mengandung huruf kecil";
+  if (!/[0-9]/.test(p)) return "Password harus mengandung angka";
+  if (!/[^A-Za-z0-9]/.test(p)) return "Password harus mengandung simbol";
+  return null;
+}
+
+/**
+ * Registrasi SPPG mandiri: membuat SPPG baru + akun OPERATOR_SPPG sekaligus,
+ * keduanya berstatus nonaktif (statusAktif=false) sampai disetujui admin.
+ * Tidak mengembalikan token — user harus menunggu approval lalu login.
+ */
+async function registerSppg(payload = {}) {
+  const fields = {};
+
+  // --- Validasi akun operator ---
+  const username = sanitizeString(payload.username, { maxLength: 50 });
+  const email = sanitizeString(payload.email, { maxLength: 100 });
+  const namaLengkap = sanitizeString(payload.namaLengkap, { maxLength: 150 });
+  const password = String(payload.password || "");
+
+  if (!username || username.length < 3 || username.length > 50 || !/^[A-Za-z0-9_]+$/.test(username)) {
+    fields.username = "Username 3-50 karakter (huruf, angka, underscore)";
+  }
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) fields.email = "Email tidak valid";
+  if (!namaLengkap || namaLengkap.length < 2) fields.namaLengkap = "Nama lengkap wajib (min 2 karakter)";
+  const ePass = validateRegisterPassword(password);
+  if (ePass) fields.password = ePass;
+
+  // --- Validasi data SPPG ---
+  const kodeSppg = sanitizeString(payload.kodeSppg, { maxLength: 20 });
+  const namaSppg = sanitizeString(payload.namaSppg, { maxLength: 200 });
+  const alamat = sanitizeString(payload.alamat, { maxLength: 500 });
+  const provinsi = sanitizeString(payload.provinsi, { maxLength: 100 });
+  const kabupatenKota = sanitizeString(payload.kabupatenKota, { maxLength: 100 });
+  const kapasitas = Number(payload.kapasitasPorsiPerHari);
+
+  if (!kodeSppg || !/^[A-Za-z0-9-]{5,20}$/.test(kodeSppg)) fields.kodeSppg = "Kode SPPG 5-20 karakter alfanumerik (boleh strip)";
+  if (!namaSppg || namaSppg.length < 3) fields.namaSppg = "Nama SPPG minimal 3 karakter";
+  if (!alamat) fields.alamat = "Alamat wajib diisi";
+  if (!provinsi) fields.provinsi = "Provinsi wajib diisi";
+  if (!kabupatenKota) fields.kabupatenKota = "Kabupaten/Kota wajib diisi";
+  if (!Number.isFinite(kapasitas) || kapasitas <= 0) fields.kapasitasPorsiPerHari = "Kapasitas harus angka > 0";
+
+  if (Object.keys(fields).length) {
+    throw new HttpError(422, "Validasi gagal", "VALIDATION_ERROR", fields);
+  }
+
+  // --- Cek duplikasi ---
+  let dupUser;
+  try {
+    dupUser = await prisma.pengguna.findFirst({
+      where: {
+        OR: [
+          { username: { equals: username, mode: "insensitive" } },
+          { email: { equals: email.toLowerCase(), mode: "insensitive" } },
+        ],
+      },
+    });
+  } catch (err) {
+    mapDatabaseAvailabilityError(err);
+  }
+  if (dupUser) throw new HttpError(409, "Username atau email sudah terdaftar", "DUPLICATE_USER");
+
+  const dupSppg = await prisma.sppg.findUnique({ where: { kodeSppg } }).catch(() => null);
+  if (dupSppg) throw new HttpError(409, "Kode SPPG sudah terdaftar", "DUPLICATE_SPPG");
+
+  const passwordHash = await bcrypt.hash(password, 12);
+
+  let result;
+  try {
+    result = await prisma.$transaction(async (tx) => {
+      const sppg = await tx.sppg.create({
+        data: {
+          kodeSppg,
+          namaSppg,
+          alamat,
+          latitude: payload.latitude !== undefined && payload.latitude !== "" ? Number(payload.latitude) : null,
+          longitude: payload.longitude !== undefined && payload.longitude !== "" ? Number(payload.longitude) : null,
+          provinsi,
+          kabupatenKota,
+          kecamatan: sanitizeString(payload.kecamatan, { maxLength: 100 }) || null,
+          kapasitasPorsiPerHari: Math.round(kapasitas),
+          mitraPengelola: sanitizeString(payload.mitraPengelola, { maxLength: 150 }) || null,
+          kontakPenanggungJawab: namaLengkap,
+          telepon: sanitizeString(payload.telepon, { maxLength: 20 }) || null,
+          statusAktif: false,
+        },
+      });
+      const user = await tx.pengguna.create({
+        data: {
+          username,
+          email: email.toLowerCase(),
+          namaLengkap,
+          peran: "OPERATOR_SPPG",
+          sppgId: sppg.id,
+          passwordHash,
+          statusAktif: false,
+        },
+      });
+      return { sppg, user };
+    });
+  } catch (err) {
+    mapDatabaseAvailabilityError(err);
+  }
+
+  return {
+    sppgId: result.sppg.id,
+    kodeSppg: result.sppg.kodeSppg,
+    namaSppg: result.sppg.namaSppg,
+    username: result.user.username,
+    status: "PENDING_APPROVAL",
+  };
+}
+
 async function refreshAccessToken(refreshToken) {
   if (!refreshToken) throw new HttpError(401, "Refresh token tidak diberikan", "NO_REFRESH");
   let payload;
@@ -331,6 +449,7 @@ async function ubahPassword({ userId, passwordLama, passwordBaru }) {
 
 module.exports = {
   login,
+  registerSppg,
   refreshAccessToken,
   logout,
   forgotPassword,
