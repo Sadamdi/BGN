@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Card, Row, Col, Statistic, Button, Space, Spin, App, DatePicker } from "antd";
+import { Card, Row, Col, Statistic, Button, Space, Spin, App, DatePicker, Collapse, Table, Typography } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 
@@ -17,6 +17,7 @@ export default function GiziListPage() {
   const [loading, setLoading] = useState(true);
   const [periodeAwal, setPeriodeAwal] = useState(dayjs().subtract(6, "month"));
   const [periodeAkhir, setPeriodeAkhir] = useState(dayjs());
+  const [akg, setAkg] = useState(null);
 
   const fetchStat = async () => {
     setLoading(true);
@@ -35,8 +36,17 @@ export default function GiziListPage() {
 
   useEffect(() => {
     fetchStat();
+    giziApi.standarAKG().then((r) => setAkg(r.data)).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const akgColumns = [
+    { title: "Kelompok", dataIndex: "label" },
+    { title: "Energi (kkal)", dataIndex: "energiKkal", align: "right" },
+    { title: "Protein (g)", dataIndex: "proteinG", align: "right" },
+    { title: "Lemak (g)", dataIndex: "lemakG", align: "right" },
+    { title: "Karbohidrat (g)", dataIndex: "karbohidratG", align: "right" },
+  ];
 
   return (
     <div>
@@ -95,6 +105,28 @@ export default function GiziListPage() {
           </Col>
         </Row>
       )}
+
+      {akg && akg.tabel ? (
+        <Card style={{ marginTop: 16 }} title="Referensi Standar Angka Kecukupan Gizi (AKG)">
+          <Typography.Paragraph type="secondary">{akg.keterangan}</Typography.Paragraph>
+          <Collapse
+            defaultActiveKey={["BALITA"]}
+            items={Object.entries(akg.tabel).map(([key, t]) => ({
+              key,
+              label: t.label,
+              children: (
+                <Table
+                  rowKey="kunci"
+                  size="small"
+                  pagination={false}
+                  dataSource={t.kelompok}
+                  columns={akgColumns}
+                />
+              ),
+            }))}
+          />
+        </Card>
+      ) : null}
     </div>
   );
 }

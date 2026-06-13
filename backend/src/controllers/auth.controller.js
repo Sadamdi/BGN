@@ -29,6 +29,20 @@ function getLoginInfo(_req, res) {
   });
 }
 
+async function postRegisterSppg(req, res, next) {
+  try {
+    const result = await auth.registerSppg(req.body || {});
+    return sukses(
+      res,
+      result,
+      "Registrasi SPPG berhasil. Akun Anda menunggu persetujuan admin sebelum dapat digunakan.",
+      201
+    );
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function postRefresh(req, res, next) {
   try {
     const { refreshToken } = req.body || {};
@@ -138,6 +152,7 @@ async function patchMePreferences(req, res, next) {
 module.exports = {
   getLoginInfo,
   postLogin,
+  postRegisterSppg,
   postRefresh,
   postLogout,
   postForgotPassword,

@@ -4,6 +4,10 @@ export function login(payload) {
   return api.post("/auth/login", payload).then((r) => r.data);
 }
 
+export function registerSppg(payload) {
+  return api.post("/auth/register-sppg", payload).then((r) => r.data);
+}
+
 export function logout() {
   return api.post("/auth/logout").then((r) => r.data);
 }

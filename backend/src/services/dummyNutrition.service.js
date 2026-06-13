@@ -1,4 +1,4 @@
-﻿"use strict";
+"use strict";
 
 const dayjs = require("dayjs");
 const utc = require("dayjs/plugin/utc");
@@ -7,6 +7,7 @@ const { prisma } = require("../config/database");
 const { getRedis } = require("../config/redis");
 const { hitungZScore, klasifikasiStatusGizi } = require("./zscore.service");
 const { generateNamaPenerima } = require("./namaGenerator");
+const { encryptText, hashIndex, maskNik } = require("../utils/encryption");
 
 const JOB_LOCK_KEY = "job:dummy-nutrition-daily";
 const TZ = "Asia/Jakarta";
@@ -466,6 +467,84 @@ async function withJobLock(fn, options = {}) {
   }
 }
 
+// NIK sintetis 16 digit deterministik dari seed (untuk data dummy penerima).
+function generateNikDummy(seed) {
+  let h = 0;
+  const text = String(seed);
+  for (let i = 0; i < text.length; i++) h = (h * 31 + text.charCodeAt(i)) >>> 0;
+  let nik = "";
+  for (let i = 0; i < 16; i++) {
+    h = (h * 1664525 + 1013904223) >>> 0;
+    nik += String(h % 10);
+  }
+  return nik;
+}
+
+const KATEGORI_PENERIMA = ["PESERTA_DIDIK", "BALITA", "IBU_HAMIL", "IBU_MENYUSUI"];
+
+function tanggalLahirUntukKategori(kategori, n) {
+  if (kategori === "BALITA") return dayjs().subtract(6 + (n % 52), "month").toDate();
+  if (kategori === "PESERTA_DIDIK") return dayjs().subtract(7 + (n % 11), "year").toDate();
+  return dayjs().subtract(20 + (n % 18), "year").toDate(); // ibu hamil/menyusui
+}
+
+/**
+ * Pastikan tiap SPPG aktif punya populasi penerima_manfaat yang proporsional dengan
+ * kapasitasnya, sehingga data antar-halaman (penerima, distribusi, gizi) berkesinambungan
+ * dan SPPG hasil registrasi baru tidak kosong. Idempotent: hanya menambah kekurangan,
+ * dibatasi total insert per run agar aman terhadap timeout serverless.
+ */
+async function ensurePenerimaForActiveSppg(sppgs, maxNewTotal = 1500) {
+  let createdTotal = 0;
+  const buffer = [];
+  for (const sppg of sppgs) {
+    if (createdTotal >= maxNewTotal) break;
+    const cap = Math.max(1, Number(sppg.kapasitasPorsiPerHari || 0));
+    // Target populasi: ~40% kapasitas, minimal 24, maksimal 200 per SPPG.
+    const target = Math.min(200, Math.max(24, Math.round(cap * 0.4)));
+    const existing = await prisma.penerimaManfaat.count({ where: { sppgId: sppg.id } });
+    let toCreate = Math.min(target - existing, maxNewTotal - createdTotal);
+    if (toCreate <= 0) continue;
+
+    for (let i = 0; i < toCreate; i++) {
+      const idx = existing + i;
+      // Komposisi kategori: PESERTA_DIDIK 55%, BALITA 25%, IBU_HAMIL 10%, IBU_MENYUSUI 10%.
+      const r = idx % 20;
+      const kategori = r < 11 ? "PESERTA_DIDIK" : r < 16 ? "BALITA" : r < 18 ? "IBU_HAMIL" : "IBU_MENYUSUI";
+      const jenisKelamin =
+        kategori === "IBU_HAMIL" || kategori === "IBU_MENYUSUI"
+          ? "PEREMPUAN"
+          : idx % 2 === 0
+          ? "LAKI_LAKI"
+          : "PEREMPUAN";
+      const nik = generateNikDummy(sppg.id + "|" + idx);
+      buffer.push({
+        nikEnc: encryptText(nik),
+        nikHash: hashIndex(nik),
+        nikMasked: maskNik(nik),
+        namaLengkap: generateNamaPenerima(sppg.id + "|penerima|" + idx, jenisKelamin),
+        tanggalLahir: tanggalLahirUntukKategori(kategori, idx),
+        jenisKelamin,
+        kategori,
+        satuanPendidikan: kategori === "PESERTA_DIDIK" ? "SDN " + ((idx % 12) + 1) : null,
+        sppgId: sppg.id,
+      });
+      createdTotal++;
+    }
+  }
+
+  // Insert berchunk; skipDuplicates agar aman terhadap tabrakan nikHash unik.
+  const chunks = chunk(buffer, 100);
+  for (const c of chunks) {
+    try {
+      await prisma.penerimaManfaat.createMany({ data: c, skipDuplicates: true });
+    } catch (err) {
+      console.error("[dummy-nutrition] createMany penerima gagal:", err.message);
+    }
+  }
+  return createdTotal;
+}
+
 async function runDailyDummyNutrition(options = {}) {
   const trigger = options.trigger || "cron";
   // Vercel Cron path: turunkan default totalMenus ke 500 agar < 5 menit.
@@ -499,6 +578,18 @@ async function runDailyDummyNutrition(options = {}) {
   const lockOptions = { skipLock: isVercelCron || isBackfill || options.skipLock === true };
 
   return withJobLock(async () => {
+    const sppgsAwal = await prisma.sppg.findMany({
+      where: { statusAktif: true },
+      select: { id: true, namaSppg: true, kapasitasPorsiPerHari: true },
+    });
+    // Pastikan populasi penerima proporsional sebelum sampling (data berkesinambungan).
+    let penerimaDibuat = 0;
+    try {
+      penerimaDibuat = await ensurePenerimaForActiveSppg(sppgsAwal);
+    } catch (err) {
+      console.error("[dummy-nutrition] ensurePenerima gagal:", err.message);
+    }
+
     const [sppgs, recipients, operators, fallbackPetugas] = await Promise.all([
       prisma.sppg.findMany({
         where: { statusAktif: true },
@@ -794,6 +885,7 @@ async function runDailyDummyNutrition(options = {}) {
       totalPorsiKemarin: totalPortionsBySlice.kemarin || 0,
       totalPorsiBesok: totalPortionsBySlice.besok || 0,
       totalPemantauanInserted: pemantauanRows.length,
+      totalPenerimaDibuat: penerimaDibuat,
       totalSppgUpdated: sppgPool.length,
       daysGenerated: ["kemarin", "hari_ini", "besok"],
       weekKeys: Array.from(weekKeys),

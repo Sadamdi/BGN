@@ -14,6 +14,8 @@ router.post("/", ctrl.buatPengguna);
 router.put("/:id", ctrl.updatePengguna);
 router.patch("/:id/password", ctrl.resetPasswordOleh);
 router.patch("/:id/status", ctrl.toggleStatus);
+router.post("/:id/approve", ctrl.approvePendaftaran);
+router.post("/:id/tolak", ctrl.tolakPendaftaran);
 router.delete("/:id", ctrl.hapusPengguna);
 
 module.exports = router;

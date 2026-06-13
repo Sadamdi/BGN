@@ -30,4 +30,17 @@ const loginLimiter = rateLimit({
   },
 });
 
-module.exports = { globalLimiter, loginLimiter };
+// Limit untuk registrasi SPPG mandiri (anti spam pendaftaran).
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: "Terlalu banyak percobaan registrasi. Silakan coba lagi 1 jam kemudian.",
+    code: "REGISTER_RATE_LIMITED",
+  },
+});
+
+module.exports = { globalLimiter, loginLimiter, registerLimiter };

@@ -197,7 +197,9 @@ async function previewStatusGizi({ user, filter }) {
     statusGizi: r.statusGizi,
     stunting: r.stunting,
   }));
+  let usedFallback = false;
   if (list.length === 0) {
+    usedFallback = true;
     const sppgWhere = buildAccessFilter(user, { statusAktif: true });
     if (filter.sppgId) sppgWhere.id = filter.sppgId;
     if (filter.provinsi) sppgWhere.provinsi = filter.provinsi;
@@ -245,6 +247,7 @@ async function previewStatusGizi({ user, filter }) {
   const stunting = list.filter((x) => x.stunting).length;
   return {
     totalRows: total,
+    dataSource: usedFallback ? "simulasi" : "real",
     summary: {
       "Total Pengukuran": total,
       "Gizi Buruk": buruk,

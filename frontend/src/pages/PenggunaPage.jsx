@@ -12,8 +12,10 @@ import {
   Progress,
   App,
   Grid,
+  Tabs,
+  Badge,
 } from "antd";
-import { PlusOutlined, EditOutlined, KeyOutlined, ReloadOutlined } from "@ant-design/icons";
+import { PlusOutlined, EditOutlined, KeyOutlined, ReloadOutlined, CheckOutlined, CloseOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 
 import PageHeader from "../components/layout/PageHeader";
@@ -53,6 +55,77 @@ export default function PenggunaPage() {
   const [form] = Form.useForm();
   const [sppgOptions, setSppgOptions] = useState([]);
   const [pwd, setPwd] = useState("");
+  const [tab, setTab] = useState("all");
+  const [pending, setPending] = useState([]);
+  const [pendingLoading, setPendingLoading] = useState(false);
+
+  const fetchPending = async () => {
+    setPendingLoading(true);
+    try {
+      const r = await penggunaApi.list({ peran: "OPERATOR_SPPG", statusAktif: "false", limit: 100 });
+      setPending(r.data || []);
+    } catch (_) {
+      /* abaikan */
+    } finally {
+      setPendingLoading(false);
+    }
+  };
+
+  const onApprove = (record) => {
+    modal.confirm({
+      title: "Setujui pendaftaran SPPG",
+      content: `Aktifkan akun ${record.namaLengkap} (${record.username}) beserta unit SPPG-nya?`,
+      okText: "Setujui",
+      onOk: async () => {
+        try {
+          await penggunaApi.approve(record.id);
+          message.success("Pendaftaran disetujui");
+          fetchPending();
+          fetchData();
+        } catch (_) {
+          message.error("Gagal menyetujui");
+        }
+      },
+    });
+  };
+
+  const onTolak = (record) => {
+    modal.confirm({
+      title: "Tolak pendaftaran SPPG",
+      content: `Tolak & hapus pendaftaran ${record.namaLengkap} (${record.username})? Tindakan ini tidak dapat dibatalkan.`,
+      okText: "Tolak",
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          await penggunaApi.tolak(record.id);
+          message.success("Pendaftaran ditolak");
+          fetchPending();
+        } catch (_) {
+          message.error("Gagal menolak");
+        }
+      },
+    });
+  };
+
+  const pendingColumns = [
+    { title: "Nama", dataIndex: "namaLengkap" },
+    { title: "Username", dataIndex: "username" },
+    { title: "Email", dataIndex: "email" },
+    { title: "Didaftarkan", dataIndex: "createdAt", render: (v) => (v ? dayjs(v).format("DD MMM YYYY HH:mm") : "-") },
+    {
+      title: "Aksi",
+      render: (r) => (
+        <Space>
+          <Button size="small" type="primary" icon={<CheckOutlined />} onClick={() => onApprove(r)}>
+            Setujui
+          </Button>
+          <Button size="small" danger icon={<CloseOutlined />} onClick={() => onTolak(r)}>
+            Tolak
+          </Button>
+        </Space>
+      ),
+    },
+  ];
 
   const fetchData = async (override = {}) => {
     setLoading(true);
@@ -75,6 +148,7 @@ export default function PenggunaPage() {
 
   useEffect(() => {
     fetchData();
+    fetchPending();
     sppgApi.list({ limit: 200 }).then((r) => setSppgOptions(r.data || [])).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter.peran, filter.statusAktif]);
@@ -169,6 +243,40 @@ export default function PenggunaPage() {
           </Button>
         }
       />
+      <Tabs
+        activeKey={tab}
+        onChange={setTab}
+        items={[
+          { key: "all", label: "Semua Pengguna" },
+          {
+            key: "pending",
+            label: (
+              <Badge count={pending.length} size="small" offset={[10, -2]}>
+                <span>Pendaftaran SPPG</span>
+              </Badge>
+            ),
+          },
+        ]}
+      />
+      {tab === "pending" ? (
+        <Card>
+          <Space style={{ marginBottom: 12 }}>
+            <Button icon={<ReloadOutlined />} onClick={fetchPending}>
+              Muat Ulang
+            </Button>
+          </Space>
+          <Table
+            rowKey="id"
+            loading={pendingLoading}
+            dataSource={pending}
+            columns={pendingColumns}
+            pagination={false}
+            locale={{ emptyText: "Tidak ada pendaftaran SPPG yang menunggu persetujuan" }}
+            scroll={{ x: 800 }}
+          />
+        </Card>
+      ) : (
+      <>
       <Card style={{ marginBottom: 16 }}>
         <Space wrap style={{ width: "100%" }}>
           <Input.Search
@@ -221,6 +329,8 @@ export default function PenggunaPage() {
           scroll={{ x: 1100 }}
         />
       </Card>
+      </>
+      )}
 
       <Modal
         title={editing ? "Edit Pengguna" : "Tambah Pengguna"}

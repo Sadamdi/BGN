@@ -21,12 +21,14 @@ import PenggunaPage from "./pages/PenggunaPage.jsx";
 import ProfilPage from "./pages/ProfilPage.jsx";
 import NotFoundPage from "./pages/NotFoundPage.jsx";
 import ResetPasswordPage from "./pages/ResetPasswordPage.jsx";
+import RegisterSppgPage from "./pages/RegisterSppgPage.jsx";
 
 export default function App() {
   return (
     <div>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/register-sppg" element={<RegisterSppgPage />} />
         <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
 
         <Route

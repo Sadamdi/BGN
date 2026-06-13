@@ -170,6 +170,13 @@ export default function LoginPage() {
             <Button type="primary" htmlType="submit" block size="large" loading={loading}>
               Masuk
             </Button>
+
+            <div style={{ textAlign: "center", marginTop: 16 }}>
+              <Text type="secondary">Punya unit SPPG baru? </Text>
+              <Button type="link" onClick={() => navigate("/register-sppg")} style={{ padding: 0 }}>
+                Daftar SPPG
+              </Button>
+            </div>
           </Form>
         </Card>
       </div>

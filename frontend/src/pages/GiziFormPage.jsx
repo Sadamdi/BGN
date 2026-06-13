@@ -176,6 +176,18 @@ export default function GiziFormPage() {
               </Tag>
             ) : null}
           </div>
+          {hasil.akg && hasil.akg.standar ? (
+            <Card size="small" style={{ marginTop: 16 }} title={`Target AKG — ${hasil.akg.kategori.replace(/_/g, " ")} (${hasil.akg.standar.label})`}>
+              <Descriptions column={{ xs: 1, sm: 2, lg: 4 }} size="small" bordered>
+                <Descriptions.Item label="AKG Harian">
+                  {hasil.akg.standar.energiKkal} kkal • {hasil.akg.standar.proteinG} g protein
+                </Descriptions.Item>
+                <Descriptions.Item label="Target Energi/Porsi MBG">{hasil.akg.targetPorsi.energiKkal} kkal</Descriptions.Item>
+                <Descriptions.Item label="Target Protein/Porsi">{hasil.akg.targetPorsi.proteinG} g</Descriptions.Item>
+                <Descriptions.Item label="Target Karbo/Porsi">{hasil.akg.targetPorsi.karbohidratG} g</Descriptions.Item>
+              </Descriptions>
+            </Card>
+          ) : null}
           {hasil.klasifikasi.statusGizi === "GIZI_BURUK" || hasil.klasifikasi.stunting ? (
             <Alert
               type="error"
