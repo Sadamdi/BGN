@@ -494,14 +494,14 @@ function tanggalLahirUntukKategori(kategori, n) {
  * dan SPPG hasil registrasi baru tidak kosong. Idempotent: hanya menambah kekurangan,
  * dibatasi total insert per run agar aman terhadap timeout serverless.
  */
-async function ensurePenerimaForActiveSppg(sppgs, maxNewTotal = 1500) {
+async function ensurePenerimaForActiveSppg(sppgs, maxNewTotal = 500) {
   let createdTotal = 0;
   const buffer = [];
   for (const sppg of sppgs) {
     if (createdTotal >= maxNewTotal) break;
     const cap = Math.max(1, Number(sppg.kapasitasPorsiPerHari || 0));
-    // Target populasi: ~40% kapasitas, minimal 24, maksimal 200 per SPPG.
-    const target = Math.min(200, Math.max(24, Math.round(cap * 0.4)));
+    // Target populasi hemat: ~15% kapasitas, minimal 12, maksimal 60 per SPPG.
+    const target = Math.min(60, Math.max(12, Math.round(cap * 0.15)));
     const existing = await prisma.penerimaManfaat.count({ where: { sppgId: sppg.id } });
     let toCreate = Math.min(target - existing, maxNewTotal - createdTotal);
     if (toCreate <= 0) continue;
@@ -551,8 +551,9 @@ async function runDailyDummyNutrition(options = {}) {
   // Trigger manual (klik tombol admin) tetap boleh 1000 sesuai UX awal.
   const isVercelCron = trigger === "vercel_cron" || trigger === "manual_cron";
   const isBackfill = String(trigger).indexOf("backfill") >= 0;
-  const defaultMenus = isVercelCron || isBackfill ? 500 : 1000;
-  const totalMenus = Math.max(100, Math.min(10000, Number(options.totalMenus) || defaultMenus));
+  // Diperkecil agar hemat kuota data-transfer DB (free tier). Sebelumnya 500/1000.
+  const defaultMenus = isVercelCron || isBackfill ? 150 : 250;
+  const totalMenus = Math.max(80, Math.min(2000, Number(options.totalMenus) || defaultMenus));
   const explicitTotalRecords = Number(options.totalRecords);
   const now = dayjs().tz(TZ);
   const runDate = now.startOf("day").toDate();
@@ -660,14 +661,15 @@ async function runDailyDummyNutrition(options = {}) {
         let porsiIbuHamil = 0;
         let porsiIbuMenyusui = 0;
 
-        const pemantauanTarget = recPool.length ? Math.min(15, Math.max(1, Math.round(target * 0.25))) : 0;
+        // Diperkecil (sebelumnya 15 & 0.25) agar jumlah baris pemantauan hemat kuota.
+        const pemantauanTarget = recPool.length ? Math.min(6, Math.max(1, Math.round(target * 0.08))) : 0;
         // Filter penerima sesuai proporsi kategori hari ini agar tidak bias ke PESERTA_DIDIK.
         const recByCategory = (k) => recPool.filter((r) => r.kategori === k);
         const kategoriSampling = [
-          { key: "PESERTA_DIDIK", count: Math.max(0, Math.round(catAlloc.PESERTA_DIDIK * 0.25)) },
-          { key: "BALITA", count: Math.max(0, Math.round(catAlloc.BALITA * 0.25)) },
-          { key: "IBU_HAMIL", count: Math.max(0, Math.round(catAlloc.IBU_HAMIL * 0.25)) },
-          { key: "IBU_MENYUSUI", count: Math.max(0, Math.round(catAlloc.IBU_MENYUSUI * 0.25)) },
+          { key: "PESERTA_DIDIK", count: Math.max(0, Math.round(catAlloc.PESERTA_DIDIK * 0.08)) },
+          { key: "BALITA", count: Math.max(0, Math.round(catAlloc.BALITA * 0.08)) },
+          { key: "IBU_HAMIL", count: Math.max(0, Math.round(catAlloc.IBU_HAMIL * 0.08)) },
+          { key: "IBU_MENYUSUI", count: Math.max(0, Math.round(catAlloc.IBU_MENYUSUI * 0.08)) },
         ];
         for (let i = 0; i < pemantauanTarget; i++) {
           // Sampling kategori secara round-robin sesuai proporsi.
@@ -730,13 +732,33 @@ async function runDailyDummyNutrition(options = {}) {
           const menuLite = todayPlan.menus[i % todayPlan.menus.length];
           const menu = menuPool.find((m) => m.code === menuLite.code) || menuPool[randInt(0, menuPool.length - 1)];
           totalEnergy += menu.totalNutrition.energyKkal;
-          if (menuSamples.length < 10) menuSamples.push(menu);
+          if (menuSamples.length < 3) menuSamples.push(menu);
         }
 
         const totalPorsi =
           porsiPesertaDidik + porsiBalita + porsiIbuHamil + porsiIbuMenyusui;
         const kapasitas = Math.max(1, sppg.kapasitasPorsiPerHari || 1);
         const realisasiPersen = round2((totalPorsi / kapasitas) * 100);
+        // Catatan ringkas: simpan menuHarian + sampel kecil saja, TANPA menuMingguan penuh
+        // (detail SPPG & laporan punya fallback buildSyntheticMenuSnapshotForSppg). Ini
+        // pemangkasan utama ukuran tulis/baca DB agar tidak menembus kuota free tier.
+        const catatanRingkas = JSON.stringify({
+          source: "dummy-nutrition-generator",
+          generatedAt: generatedAt.toISOString(),
+          realisasiPersen,
+          totalMenuGenerated: totalMenus,
+          totalPorsiGenerated: dailyTotalPortions,
+          sliceKey: slice.key,
+          weekdayKey,
+          menuHarian: todayPlan,
+          menuHarianSampel: menuSamples.map((m) => ({
+            code: m.code,
+            title: m.title,
+            itemCount: m.items.length,
+            totalNutrition: m.totalNutrition,
+          })),
+          averageEnergyPerPortion: round2(totalEnergy / Math.max(1, totalPorsi)),
+        });
         upsertDistribusi.push(
           prisma.distribusiMbg.upsert({
             where: {
@@ -752,28 +774,11 @@ async function runDailyDummyNutrition(options = {}) {
             porsiIbuMenyusui,
             totalPorsi,
             status: "TERVALIDASI",
-            catatan: JSON.stringify({
-              source: "dummy-nutrition-generator",
-              generatedAt: generatedAt.toISOString(),
-              realisasiPersen,
-              totalMenuGenerated: totalMenus,
-              totalPorsiGenerated: dailyTotalPortions,
-              sliceKey: slice.key,
-              weekdayKey,
-              menuHarian: todayPlan,
-              menuMingguan: weeklyPlan,
-              menuHarianSampel: menuSamples.map((m) => ({
-                code: m.code,
-                title: m.title,
-                itemCount: m.items.length,
-                totalNutrition: m.totalNutrition,
-              })),
-              averageEnergyPerPortion: round2(totalEnergy / Math.max(1, totalPorsi)),
-            }),
+            catatan: catatanRingkas,
           },
           create: {
-              sppgId: sppg.id,
-              tanggalDistribusi: slice.date,
+            sppgId: sppg.id,
+            tanggalDistribusi: slice.date,
             porsiPesertaDidik,
             porsiBalita,
             porsiIbuHamil,
@@ -782,25 +787,8 @@ async function runDailyDummyNutrition(options = {}) {
             status: "TERVALIDASI",
             operatorId: operatorBySppg.get(sppg.id) || fallbackPetugasId,
             validatorId: fallbackPetugasId,
-            catatan: JSON.stringify({
-              source: "dummy-nutrition-generator",
-              generatedAt: generatedAt.toISOString(),
-              realisasiPersen,
-              totalMenuGenerated: totalMenus,
-              totalPorsiGenerated: dailyTotalPortions,
-              sliceKey: slice.key,
-              weekdayKey,
-              menuHarian: todayPlan,
-              menuMingguan: weeklyPlan,
-              menuHarianSampel: menuSamples.map((m) => ({
-                code: m.code,
-                title: m.title,
-                itemCount: m.items.length,
-                totalNutrition: m.totalNutrition,
-              })),
-              averageEnergyPerPortion: round2(totalEnergy / Math.max(1, totalPorsi)),
-            }),
-            },
+            catatan: catatanRingkas,
+          },
           })
         );
       }
